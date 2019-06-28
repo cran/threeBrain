@@ -1,0 +1,68 @@
+.hidden {
+  display: none!important;
+}
+
+.threejs-control .dg .c,
+.threejs-control .dg button,
+.threejs-control .dg input,
+.threejs-control .dg optgroup,
+.threejs-control .dg select,
+.threejs-control .dg textarea {
+  line-height: normal;
+}
+
+
+.threejs-control {
+  position: relative;
+  float: right;
+  max-width: 300px;
+  margin-bottom: -100%;
+  width: 300px;
+  overflow-y: scroll;
+  overflow-x: hidden;
+  /* pointer-events: none; */
+}
+
+.threejs-control .dg .c select{
+  color: cornflowerblue;
+}
+
+
+.threejs-control *{
+  /* pointer-events: auto; */
+}
+
+
+.threejs-control .dg.main {
+  /* opacity: 0.4; */
+  padding-bottom: 20px;
+  width: 100% !important;
+}
+
+
+.threejs-control div.close-button{
+  width:100%!important;
+}
+
+
+.threejs-control .dg.main,
+.threejs-control .dg.main *,
+.threejs-control .dg.main ::after,
+.threejs-control .dg.main ::before{
+  box-sizing: content-box;
+}
+
+.threejs-control .dg.main:hover {
+    opacity: 1;
+}
+
+
+.THREEBRAIN-SIDE-DIVIDER {
+  width: 5px;
+  background-color: black;
+  cursor: col-resize;
+}
+
+.THREEBRAIN-SIDE-DIVIDER::before {
+  content: ' ';
+}
