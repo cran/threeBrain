@@ -6,13 +6,14 @@
 \usage{
 threejs_brain(..., .list = list(), width = NULL, height = NULL,
   side_canvas = FALSE, side_zoom = 1, side_width = 250,
-  side_shift = c(0, 0), control_panel = TRUE, control_presets = NULL,
+  side_shift = c(0, 0), side_display = TRUE, control_panel = TRUE,
+  control_presets = NULL, control_display = TRUE,
   camera_center = c(0, 0, 0), camera_pos = c(0, 0, 500),
   start_zoom = 1, coords = NULL, symmetric = 0,
-  default_colormap = "Value", palettes = NULL,
-  widget_id = "threebrain_data", tmp_dirname = NULL, debug = FALSE,
-  token = NULL, optionals = list(), browser_external = TRUE,
-  global_data = list())
+  default_colormap = "Value", palettes = NULL, val_ranges = NULL,
+  show_inactive_electrodes = TRUE, widget_id = "threebrain_data",
+  tmp_dirname = NULL, debug = FALSE, token = NULL,
+  optionals = list(), browser_external = TRUE, global_data = list())
 }
 \arguments{
 \item{..., .list}{geometries inherit from AbstractGeom}
@@ -28,9 +29,13 @@ By default width=`100\%`, and height varies.}
 
 \item{side_shift}{integer of length two, side panel shift in pixels (`CSS style`: top, left)}
 
+\item{side_display}{logical, show/hide side panels at beginning}
+
 \item{control_panel}{logical, enable control panels for the widget}
 
 \item{control_presets}{characters, presets to be shown in control panels}
+
+\item{control_display}{logical, whether to expand/collapse control UI at the beginning}
 
 \item{camera_center}{numerical, length of three, XYZ position where camera should focus at}
 
@@ -45,6 +50,10 @@ By default width=`100\%`, and height varies.}
 \item{default_colormap}{character, which color map name to display at startup}
 
 \item{palettes}{named list, names corresponds to color-map names if you want to change color palettes}
+
+\item{val_ranges}{named list, similar to \code{palettes}, value range for each values}
+
+\item{show_inactive_electrodes}{logical, whether to show electrodes with no values}
 
 \item{widget_id}{character, internally used as unique identifiers for widgets.
 Only use it when you have multiple widgets in one website}

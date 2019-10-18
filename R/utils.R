@@ -238,10 +238,9 @@ read_fs_m3z <- function(filename){
 #' Read `FreeSurfer` `mgz/mgh` file
 #' @param filename file location
 #' @return list contains coordinate transforms and volume data
-#' @export
 read_fs_mgh_mgz <- function(filename) {
-  # filename = '~/rave_data/others/three_brain/N27/mri/brain.finalsurfs.mgz'
-  # filename = '/Volumes/data/UT/YCQ/iELVis_Localization/YCQ/mri/brain.finalsurfs.mgz'
+  # filename = '~/rave_data/others/three_brain/N27/mri/T1.mgz'
+  # filename = '/Volumes/data/UT/YCQ/iELVis_Localization/YCQ/mri/T1.mgz'
 
   get_conn = function(){
     extension = stringr::str_extract(filename, '[^.]+$')

@@ -5,12 +5,16 @@
 #'   By default width=`100\%`, and height varies.
 #' @param default_colormap character, which color map name to display at startup
 #' @param palettes named list, names corresponds to color-map names if you want to change color palettes
+#' @param val_ranges named list, similar to \code{palettes}, value range for each values
+#' @param show_inactive_electrodes logical, whether to show electrodes with no values
 #' @param side_canvas logical, enable side cameras to view objects from fixed perspective
 #' @param side_zoom numerical, if side camera is enabled, zoom-in level, from 1 to 5
 #' @param side_width positive integer, side panel size in pixels
 #' @param side_shift integer of length two, side panel shift in pixels (`CSS style`: top, left)
+#' @param side_display logical, show/hide side panels at beginning
 #' @param control_panel logical, enable control panels for the widget
 #' @param control_presets characters, presets to be shown in control panels
+#' @param control_display logical, whether to expand/collapse control UI at the beginning
 #' @param camera_center numerical, length of three, XYZ position where camera should focus at
 #' @param camera_pos XYZ position of camera itself, default (0, 0, 500)
 #' @param start_zoom numerical, positive number indicating camera zoom level
@@ -30,16 +34,17 @@ threejs_brain <- function(
 
   # Args for the side panels
   side_canvas = FALSE, side_zoom = 1, side_width = 250, side_shift = c(0, 0),
+  side_display = TRUE,
 
   # for controls GUI
-  control_panel = TRUE, control_presets = NULL,
+  control_panel = TRUE, control_presets = NULL, control_display = TRUE,
 
   # Main camera and scene center
   camera_center = c(0,0,0), camera_pos = c(0,0,500), start_zoom = 1, coords = NULL,
 
   # For colors and animation
   symmetric = 0, default_colormap = 'Value',
-  palettes = NULL,
+  palettes = NULL, val_ranges = NULL, show_inactive_electrodes = TRUE,
 
   # Builds, additional data, etc (misc)
   widget_id = 'threebrain_data', tmp_dirname = NULL,
@@ -74,10 +79,15 @@ threejs_brain <- function(
   animation_types = unique(unlist( lapply(geoms, function(g){ g$animation_types }) ))
   if(!is.list(palettes)){ palettes = list() }
   pnames = names(palettes)
+  if(!is.list(val_ranges)){ val_ranges = list() }
+
   color_maps = sapply(animation_types, function(atype){
     c = ColorMap$new(name = atype, .list = geoms, symmetric = symmetric)
     if( atype %in% pnames ){
       c$set_colors( palettes[[atype]] )
+    }
+    if( c$value_type == 'continuous' && length(val_ranges[[atype]]) == 2 ){
+      c$value_range = val_ranges[[atype]]
     }
     c$to_list()
   }, USE.NAMES = TRUE, simplify = FALSE)
@@ -94,6 +104,23 @@ threejs_brain <- function(
 
   # Check elements
   geoms = lapply(geoms, function(g){ g$to_list() })
+
+  # Check lib_path. whether running inside of shiny or standalone
+  if(is.null(shiny::getDefaultReactiveDomain())){
+    lib_path = 'lib/'
+  }else{
+    lib_path = ''
+    if(is.null(token)){
+      session = shiny::getDefaultReactiveDomain()
+      token = session$userData$rave_id
+    }
+
+    # If in shiny, token is given or rave_id is given, we use fixed temp path
+    # in this way to reduce redundency
+    if( !is.null(token) && length(tmp_dirname) != 1 ){
+      tmp_dirname = token
+    }
+  }
 
   # Check cached json files
   if(length(tmp_dirname) != 1){
@@ -126,17 +153,6 @@ threejs_brain <- function(
   # Get groups
   groups = lapply(groups, function(g){ g$to_list() })
 
-  if(is.null(shiny::getDefaultReactiveDomain())){
-    lib_path = 'lib/'
-  }else{
-    lib_path = ''
-    if(is.null(token)){
-      session = shiny::getDefaultReactiveDomain()
-      token = session$userData$rave_id
-    }
-  }
-
-
 
   # Generate settings
   settings = list(
@@ -158,7 +174,10 @@ threejs_brain <- function(
     debug = debug,
     # has_animation = v_count > 1,
     token = token,
-    coords = coords
+    coords = coords,
+    show_inactive_electrodes = isTRUE(show_inactive_electrodes),
+    side_display = side_display,
+    control_display = control_display
   )
 
   # Generate external file

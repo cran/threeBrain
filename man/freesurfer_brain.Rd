@@ -5,7 +5,8 @@
 \title{Read `FreeSurfer` surface and volume files}
 \usage{
 freesurfer_brain(fs_subject_folder, subject_name,
-  additional_surfaces = NULL, use_cache = TRUE, use_141 = TRUE)
+  additional_surfaces = NULL, aligned_ct = NULL, use_cache = TRUE,
+  use_141 = TRUE)
 }
 \arguments{
 \item{fs_subject_folder}{character, `FreeSurfer` subject folder, or `RAVE` subject folder}
@@ -13,6 +14,8 @@ freesurfer_brain(fs_subject_folder, subject_name,
 \item{subject_name}{character, subject code to display with only letters and digits}
 
 \item{additional_surfaces}{character array, additional surface types to load, such as `white`, `smoothwm`}
+
+\item{aligned_ct}{character, path to `ct_aligned_mri.nii.gz`, used for electrode localization}
 
 \item{use_cache}{logical, whether to use cached `json` files or from raw `FreeSurfer` files}
 
@@ -24,11 +27,11 @@ Read `FreeSurfer` surface and volume files
 \details{
 This function is under FreeSurfer license.
 1. Volumes:
-3D viewer uses `mri/brain.finalsurfs.mgz` from `FreeSurfer` to show the
-volume information. `brain.finalsurfs.mgz` results from step 1 to 15 in `FreeSurfer`
-command `recon-all`, which aligns the original `DICOM` image to `RAS` coordinate
+3D viewer uses `mri/T1.mgz` from `FreeSurfer` to show the
+volume information. `T1.mgz` results from step 1 to 5 in `FreeSurfer`
+command `recon-all -autorecon1`, which aligns the original `DICOM` image to `RAS` coordinate
 system, resamples to volume with \code{256x256x256} voxels (tri-linear by default,
-check \url{https://mail.nmr.mgh.harvard.edu/pipermail/freesurfer/2018-August/058127.html}
+check \url{https://surfer.nmr.mgh.harvard.edu/fswiki/recon-all}
 for more information).
 
 2. Surface:
@@ -58,7 +61,7 @@ at template brain are the mapped electrode coordinates.
 If standard 141 brain is missing, or the electrode type is `stereo EEG`, then
 the second option is volume mapping. The idea is to map electrodes to `MNI305`
 brain. The details can be found at \url{https://surfer.nmr.mgh.harvard.edu/fswiki/CoordinateSystems}.
-To perform volume mapping, we need `FreeSurfer` folder `mri/tranforms`.
+To perform volume mapping, we need `FreeSurfer` folder `mri/transforms`.
 Currently, only linear `Talairach` transform matrix is supported (located at
 `talairach.xfm`).
 

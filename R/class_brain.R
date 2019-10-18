@@ -131,7 +131,7 @@ BrainVolume <- R6::R6Class(
     subject_code = '',
 
     # which surface type pial, white, inflated ...
-    volume_type = 'brain.finalsurf',
+    volume_type = 'T1',
 
     # to store freemesh objects, left, right, in sequential
     object = NULL,
@@ -359,6 +359,9 @@ BrainElectrodes <- R6::R6Class(
         el$vertex_number = nearest_vertex
         el$subject_code = subject_code
         el$MNI305_position = mni_305
+        # Add two color schemes
+        el$set_value( value = '', name = '[Hightlight]' )
+        el$set_value( value = as.character(subject_code), name = '[Subject]' )
         self$objects[[ row$Electrode ]] = el
       }
     },
@@ -411,7 +414,7 @@ BrainElectrodes <- R6::R6Class(
 
       # Need to figure out what variables to be put into electrodes
 
-      var_names = var_names[ !var_names %in% c('Electrode', 'Time') ]
+      var_names = var_names[ !var_names %in% c('Electrode', 'Time', 'Note') ]
 
       # Check values
       for( vn in var_names ){
@@ -427,6 +430,9 @@ BrainElectrodes <- R6::R6Class(
           # if no subset, then remove keyframes, else set keyframes
           el$set_value(value = sub[[vn]], time_stamp = sub$Time,
                        name = vn, target = '.material.color')
+          if( length(sub$Note) && is.character(sub$Note) ){
+            el$custom_info = sub$Note
+          }
         })
         NULL
       })
@@ -734,7 +740,7 @@ Brain2 <- R6::R6Class(
       volumes = TRUE, surfaces = TRUE,
 
       # Layouts
-      side_canvas = TRUE, side_width = 250, side_shift = c(0, 0),
+      side_canvas = TRUE, side_width = 250, side_shift = c(0, 0), side_display = TRUE,
       control_panel = TRUE, default_colormap = NULL,
 
       # Legend and color
@@ -762,12 +768,16 @@ Brain2 <- R6::R6Class(
            'map_template', 'electrodes', control_presets)
       )
 
+      if( !length(self$volumes) ){
+        side_display = FALSE
+      }
+
       threejs_brain(
         .list = geoms,
         symmetric = symmetric, palettes = palettes,
         side_canvas = side_canvas,  side_width = side_width, side_shift = side_shift,
         control_panel = control_panel, control_presets = control_presets,
-        default_colormap = default_colormap,
+        default_colormap = default_colormap, side_display = side_display,
         width = width, height = height, debug = debug, token = token,
         browser_external = browser_external, global_data = global_data, ...)
     }
