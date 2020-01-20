@@ -48,7 +48,7 @@
 #' @param additional_surfaces character array, additional surface types to load, such as `white`, `smoothwm`
 #' @param aligned_ct character, path to `ct_aligned_mri.nii.gz`, used for electrode localization
 #' @param use_cache logical, whether to use cached `json` files or from raw `FreeSurfer` files
-#' @param use_141 logical, whether to use standard 141 brain for surface file
+#' @param use_141 logical, whether to use standard 141 brain for surface file, default is \code{getOption('threeBrain.use141', TRUE)}
 #'
 #' @examples
 #' \donttest{
@@ -68,7 +68,7 @@
 freesurfer_brain <- function(fs_subject_folder, subject_name,
                              additional_surfaces = NULL,
                              aligned_ct = NULL,
-                             use_cache = TRUE, use_141 = TRUE){
+                             use_cache = TRUE, use_141 = getOption('threeBrain.use141', TRUE)){
   # Naming conventions
   #
   # Volume group:   Volume (YAB)
@@ -167,7 +167,7 @@ freesurfer_brain <- function(fs_subject_folder, subject_name,
 
 
   ##### get volume 256x256x256 ####
-  dir.create(path_cache, recursive = TRUE, showWarnings = FALSE)
+  dir_create(path_cache)
 
   geom_brain_t1 = NULL
 
@@ -182,7 +182,7 @@ freesurfer_brain <- function(fs_subject_folder, subject_name,
       geom_brain_t1 = DataCubeGeom$new(
         name = sprintf('T1 (%s)', subject_name), value = array(NA, dim = volume_shape),
         dim = volume_shape, half_size = volume_shape / 2, group = group_volume,
-        position = c(0,0,0), cache_file = cache_volume)
+        position = c(0,0,0), cache_file = cache_volume, digest = FALSE)
     }else{
       unlink(cache_volume)
     }
@@ -243,7 +243,7 @@ freesurfer_brain <- function(fs_subject_folder, subject_name,
         name = sprintf('ct.aligned.t1 (%s)', subject_name),
         value = array(NA, dim = ct_shape), dim = ct_shape,
         half_size = ct_shape / 2, group = group_ct, position = c(0,0,0),
-        cache_file = cache_ct)
+        cache_file = cache_ct, digest = FALSE)
     }else{
       unlink( cache_ct )
     }
@@ -395,14 +395,14 @@ freesurfer_brain <- function(fs_subject_folder, subject_name,
 
 #' @title Function to check whether `FreeSurfer` folder has everything we need
 #' @param fs_subject_folder character, path to `fs` project directory or `RAVE` subject directory
-#' @param autoinstall_template logical, whether `N27` brain should be installed is missing
+#' @param autoinstall_template logical, whether `N27` brain should be installed if missing
 #' @param return_path logical, whether to return `FreeSurfer` path
 #' @param check_volume logical, whether to check volume data
 #' @param check_surface logical, whether to check surface data (not implemented yet)
 #' @return logical whether the directory is valid or, if \code{return_path} is true,
 #' return `FreeSurfer` path
 #' @export
-check_freesurfer_path <- function(fs_subject_folder, autoinstall_template = TRUE,
+check_freesurfer_path <- function(fs_subject_folder, autoinstall_template = FALSE,
                                   return_path = FALSE, check_volume = FALSE, check_surface = FALSE){
   pass_test = FALSE
   if( dir.exists(fs_subject_folder) ){
@@ -455,10 +455,10 @@ check_freesurfer_path <- function(fs_subject_folder, autoinstall_template = TRUE
   }
 
   if( pass_test ){
-    dir.create(file.path(path_subject, 'mri', 'transforms'), showWarnings = FALSE, recursive = TRUE)
-    dir.create(file.path(path_subject, 'surf'), showWarnings = FALSE, recursive = TRUE)
-    dir.create(file.path(path_subject, 'SUMA'), showWarnings = FALSE, recursive = TRUE)
-    dir.create(file.path(path_subject, 'RAVE'), showWarnings = FALSE, recursive = TRUE)
+    dir_create(file.path(path_subject, 'mri', 'transforms'))
+    dir_create(file.path(path_subject, 'surf'))
+    dir_create(file.path(path_subject, 'SUMA'))
+    dir_create(file.path(path_subject, 'RAVE'))
     if( return_path ){ return( path_subject ) } else { return(TRUE) }
   }
   if( return_path ){ return( NULL ) } else { return(FALSE) }
@@ -497,7 +497,18 @@ load_surface_asc_gii <- function(file){
     surf = read_gii2(file)
 
   }else{
-    stop('Only support ASCII, Gifti formats. Unknown type')
+    # Use freesurferformats:::read.fs.surface
+    tryCatch({
+      tmp = freesurferformats::read.fs.surface(file)
+      surf = list(
+        header = c(nrow(tmp$vertices), nrow(tmp$faces)),
+        vertices = tmp$vertices[, 1:3],
+        faces = tmp$faces[, 1:3]
+      )
+    }, error = function(e){
+      stop('Unknown type - Only support ASCII, Gifti, or native FS formats (if freesurferformats is installed).')
+    })
+
   }
   return(surf)
 }

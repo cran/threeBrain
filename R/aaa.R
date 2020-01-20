@@ -16,16 +16,17 @@
 #' @importFrom utils unzip
 NULL
 
+cache_version = 0.1
 
 #' @title Setup Package, Install Environment
 #' @author Zhengjia Wang
 #' @param continued logical, there are two phases of setting up environment. You
 #' probably need to restart R session after the first phase and continue setting up.
 #' @param show_example whether to show example of `N27` subject at the end.
-#' @param use_python whether to install python toolbox (recommended)
+#' @param use_python whether to install python toolbox (recommended, but not by default)
 #' @param try_conda try to use `conda` to create `RAVEPy` environment
 #' @export
-brain_setup <- function(continued = FALSE, show_example = TRUE, use_python=TRUE, try_conda = TRUE){
+brain_setup <- function(continued = FALSE, show_example = TRUE, use_python=FALSE, try_conda = TRUE){
   if( use_python && !continued ){
     cat2('Step 1: checking python environment', level = 'INFO')
     info = ravepy_info()
@@ -91,14 +92,12 @@ brain_setup <- function(continued = FALSE, show_example = TRUE, use_python=TRUE,
     cat2('Wrapping up installation...', level = 'INFO')
 
     template_dir = getOption('threeBrain.template_dir', '~/rave_data/others/three_brain')
-    freesurfer_brain(fs_subject_folder = file.path(template_dir, 'N27'),
-                           subject_name = 'N27', additional_surfaces = c(
-                             'white', 'smoothwm', 'inflated', 'pial-outer-smoothed'), use_141 = FALSE)
-    env = freesurfer_brain(fs_subject_folder = file.path(template_dir, 'N27'),
-                           subject_name = 'N27', additional_surfaces = c(
-                             'white', 'smoothwm', 'inflated', 'inf_200', 'pial-outer-smoothed'))
+    import_from_freesurfer(fs_path = file.path(template_dir, 'N27'), subject_name = 'N27')
+
 
     if( show_example ){
+      env = freesurfer_brain2(fs_subject_folder = file.path(template_dir, 'N27'),
+                              subject_name = 'N27', surface_types = c('pial', 'smoothwm'))
       plot(env)
     }
 

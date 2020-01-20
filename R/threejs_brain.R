@@ -3,10 +3,13 @@
 #' @param ...,.list geometries inherit from AbstractGeom
 #' @param width,height positive integers. Width and height of the widget.
 #'   By default width=`100\%`, and height varies.
+#' @param background character, background color such as \code{"#FFFFFF"} or \code{"white"}
+#' @param cex positive number, relative text magnification level
 #' @param default_colormap character, which color map name to display at startup
 #' @param palettes named list, names corresponds to color-map names if you want to change color palettes
 #' @param val_ranges named list, similar to \code{palettes}, value range for each values
 #' @param show_inactive_electrodes logical, whether to show electrodes with no values
+#' @param timestamp logical, whether to show timestamp at the beginning
 #' @param side_canvas logical, enable side cameras to view objects from fixed perspective
 #' @param side_zoom numerical, if side camera is enabled, zoom-in level, from 1 to 5
 #' @param side_width positive integer, side panel size in pixels
@@ -23,24 +26,25 @@
 #' @param tmp_dirname character path, internally used, where to store temporary files
 #' @param token unique character, internally used to identify widgets in JS localStorage
 #' @param debug logical, internally used for debugging
-#' @param optionals internally used, to be deprecated
+#' @param controllers list to override the settings, for example \code{proxy$get_controllers()}
 #' @param browser_external logical, use system default browser (default) or builtin one.
-#' @param global_data internally use, mainly to store orientation matrices.
+#' @param global_data,global_files internally use, mainly to store orientation matrices and files.
 #' @param widget_id character, internally used as unique identifiers for widgets.
 #'   Only use it when you have multiple widgets in one website
 #' @export
 threejs_brain <- function(
-  ..., .list = list(), width = NULL, height = NULL,
+  ..., .list = list(), width = NULL, height = NULL, background = "#FFFFFF",
+  cex = 1, timestamp = TRUE,
 
   # Args for the side panels
   side_canvas = FALSE, side_zoom = 1, side_width = 250, side_shift = c(0, 0),
-  side_display = TRUE,
+  side_display = TRUE, # side_background = background,
 
   # for controls GUI
   control_panel = TRUE, control_presets = NULL, control_display = TRUE,
 
   # Main camera and scene center
-  camera_center = c(0,0,0), camera_pos = c(0,0,500), start_zoom = 1, coords = NULL,
+  camera_center = c(0,0,0), camera_pos = c(500,0,0), start_zoom = 1, coords = NULL,
 
   # For colors and animation
   symmetric = 0, default_colormap = 'Value',
@@ -48,8 +52,8 @@ threejs_brain <- function(
 
   # Builds, additional data, etc (misc)
   widget_id = 'threebrain_data', tmp_dirname = NULL,
-  debug = FALSE, token = NULL, optionals = list(),
-  browser_external = TRUE, global_data = list()
+  debug = FALSE, token = NULL, controllers = list(),
+  browser_external = TRUE, global_data = list(), global_files = list()
 ){
 
   stopifnot2(length(camera_center) == 3 && is.numeric(camera_center), msg = 'camera_center must be a numeric vector of 3')
@@ -63,6 +67,17 @@ threejs_brain <- function(
       name = sprintf('__global_data__%s', nm),
       value = global_data[[ nm ]]
     )
+  })
+  sapply( names(global_files), function(nm){
+    file_info = as.list(global_files[[nm]])
+    if(all(c("path", "absolute_path", "file_name", "is_new_cache", "is_cache") %in% names(file_info))){
+      global_container$group$set_group_data(
+        name = sprintf('__global_data__%s', nm),
+        value = file_info,
+        is_cached = TRUE,
+        cache_if_not_exists = FALSE
+      )
+    }
   })
 
 
@@ -100,6 +115,10 @@ threejs_brain <- function(
     default_colormap = NULL
   }
 
+  # backgrounds
+  background = dipsaus::col2hexStr(background)
+  # side_background = dipsaus::col2hexStr(side_background)
+
 
 
   # Check elements
@@ -127,11 +146,11 @@ threejs_brain <- function(
     tmp_dirname = paste(sample(c(letters, LETTERS, 0:9), 10), collapse = '')
   }
   tmp_dir = file.path(tempdir(), 'threebrain_cache', tmp_dirname)
-  dir.create(tmp_dir, recursive = TRUE, showWarnings = FALSE)
+  dir_create(tmp_dir)
 
   lapply(groups, function(g){
     if(length(g$cached_items)){
-      dir.create(file.path(tmp_dir, g$cache_name()), recursive = TRUE, showWarnings = FALSE)
+      dir_create(file.path(tmp_dir, g$cache_name()))
       for(f in g$cached_items){
         re = g$group_data[[f]]
         file.copy(re$absolute_path, to = file.path(tmp_dir, g$cache_name(), re$file_name))
@@ -165,13 +184,16 @@ threejs_brain <- function(
     hide_controls = !control_panel,
     control_center = as.vector(camera_center),
     camera_pos = camera_pos,
+    font_magnification = ifelse(cex > 0, cex, 1),
     start_zoom = ifelse(start_zoom > 0, start_zoom, 1),
     show_legend = TRUE,
+    render_timestamp = isTRUE(timestamp),
     control_presets = control_presets,
     cache_folder = paste0(lib_path, widget_id, '-0/'),
     lib_path = lib_path,
-    optionals = optionals,
+    default_controllers = controllers,
     debug = debug,
+    background = background,
     # has_animation = v_count > 1,
     token = token,
     coords = coords,
@@ -213,11 +235,14 @@ threejs_brain <- function(
 #' @param outputId unique identifier for the widget
 #' @param width,height width and height of the widget. By default width="100%",
 #'   and height="500px".
+#' @param reportSize whether to report widget size in shiny
+#' \code{session$clientData}
 NULL
 
 #' @export
-threejsBrainOutput <- function(outputId, width = '100%', height = '500px'){
-  htmlwidgets::shinyWidgetOutput(outputId, "threejs_brain", width, height, package = "threeBrain")
+threejsBrainOutput <- function(outputId, width = '100%', height = '500px', reportSize = TRUE){
+  htmlwidgets::shinyWidgetOutput(outputId, "threejs_brain", width, height, package = "threeBrain",
+                                 reportSize = reportSize, inline = FALSE)
 }
 
 
@@ -249,12 +274,12 @@ renderBrain <- function(expr, env = parent.frame(), quoted = FALSE) {
 #' @param as_zip whether to create zip file "compressed.zip".
 #' @export
 save_brain <- function(widget, directory, filename = 'index.html', assetpath = 'lib/', datapath = 'lib/threebrain_data-0/', title = '3D Viewer', as_zip = FALSE){
-  dir.create(directory, showWarnings = F, recursive = T)
+  dir_create(directory)
   cat2('Generating 3D Viewer...')
 
   # Need to save json data to datapath. Must be a relative path
-  dir.create(file.path(directory, datapath), recursive = TRUE, showWarnings = FALSE)
-  dir.create(file.path(directory, assetpath), recursive = TRUE, showWarnings = FALSE)
+  dir_create(file.path(directory, datapath))
+  dir_create(file.path(directory, assetpath))
   datapath = stringr::str_replace_all(datapath, '[/]{0}$', '/')
   datapath = stringr::str_replace_all(datapath, '[/\\\\]+', '/')
   datapath = stringr::str_replace_all(datapath, '^/', '')
@@ -286,8 +311,8 @@ save_brain <- function(widget, directory, filename = 'index.html', assetpath = '
 
   s = c(
     '#!/bin/bash',
-    'DIRECTORY=`dirname $0`',
-    'cd $DIRECTORY',
+    'DIRECTORY=`dirname "$0"`',
+    'cd "$DIRECTORY"',
     "Rscript -e '{if(system.file(\"\",package=\"servr\")==\"\"){install.packages(\"servr\",repos=\"https://cloud.r-project.org\")};servr::httd(browser=TRUE)}'"
   )
   sh_file = file.path(directory, 'launch.sh')

@@ -24,10 +24,10 @@ NULL
 #' @export
 download_template_subject <- function(
   subject_code = 'N27',
-  url = 'https://rave-data.s3.amazonaws.com/sample-data/N27_fs.zip',
+  url = 'https://github.com/dipterix/threeBrain-sample/releases/download/1.0.0/N27.zip',
   template_dir = getOption('threeBrain.template_dir', '~/rave_data/others/three_brain')
 ){
-  dir.create(template_dir, showWarnings = F, recursive = T)
+  dir_create(template_dir)
   dir = normalizePath(template_dir)
 
   options('threeBrain.template_dir' = dir)
@@ -38,8 +38,9 @@ download_template_subject <- function(
   utils::download.file(url = url, destfile = destzip, quiet = F, cacheOK = T)
 
   sub_dir = file.path(dir, subject_code)
+  # sub_dir = dir
 
-  utils::unzip(destzip, exdir = sub_dir, overwrite = TRUE)
+  utils::unzip(destzip, exdir = dir, overwrite = TRUE)
 
   # check if files need move
   if( !'mri' %in% list.dirs(sub_dir, recursive = FALSE, full.names = FALSE) ){
@@ -50,7 +51,9 @@ download_template_subject <- function(
     if( length(mri_dir) ){
       brain_mgz = list.files(file.path(sub_dir, mri_dir), full.names = TRUE, pattern = 'T1.mgz$')
       dir_from = dirname(dirname(brain_mgz))
-      file_move(dir_from, sub_dir, overwrite = TRUE, clean = TRUE, all_files = TRUE)
+      if(length(dir_from)){
+        file_move(dir_from, sub_dir, overwrite = TRUE, clean = TRUE, all_files = TRUE)
+      }
     }
   }
 
@@ -94,7 +97,7 @@ set_default_template <- function(subject_code, view = TRUE,
   }else{
 
     # try to load template subject
-    x = freesurfer_brain(fs_subject_folder = sub_dir, subject_name = subject_code)
+    x = freesurfer_brain2(fs_subject_folder = sub_dir, subject_name = subject_code)
 
     if( !is.null(x) ){
       options('threeBrain.template_dir' = dir)

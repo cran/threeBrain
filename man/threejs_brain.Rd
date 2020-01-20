@@ -4,22 +4,52 @@
 \alias{threejs_brain}
 \title{Create a Threejs Brain and View it in Browsers}
 \usage{
-threejs_brain(..., .list = list(), width = NULL, height = NULL,
-  side_canvas = FALSE, side_zoom = 1, side_width = 250,
-  side_shift = c(0, 0), side_display = TRUE, control_panel = TRUE,
-  control_presets = NULL, control_display = TRUE,
-  camera_center = c(0, 0, 0), camera_pos = c(0, 0, 500),
-  start_zoom = 1, coords = NULL, symmetric = 0,
-  default_colormap = "Value", palettes = NULL, val_ranges = NULL,
-  show_inactive_electrodes = TRUE, widget_id = "threebrain_data",
-  tmp_dirname = NULL, debug = FALSE, token = NULL,
-  optionals = list(), browser_external = TRUE, global_data = list())
+threejs_brain(
+  ...,
+  .list = list(),
+  width = NULL,
+  height = NULL,
+  background = "#FFFFFF",
+  cex = 1,
+  timestamp = TRUE,
+  side_canvas = FALSE,
+  side_zoom = 1,
+  side_width = 250,
+  side_shift = c(0, 0),
+  side_display = TRUE,
+  control_panel = TRUE,
+  control_presets = NULL,
+  control_display = TRUE,
+  camera_center = c(0, 0, 0),
+  camera_pos = c(500, 0, 0),
+  start_zoom = 1,
+  coords = NULL,
+  symmetric = 0,
+  default_colormap = "Value",
+  palettes = NULL,
+  val_ranges = NULL,
+  show_inactive_electrodes = TRUE,
+  widget_id = "threebrain_data",
+  tmp_dirname = NULL,
+  debug = FALSE,
+  token = NULL,
+  controllers = list(),
+  browser_external = TRUE,
+  global_data = list(),
+  global_files = list()
+)
 }
 \arguments{
 \item{..., .list}{geometries inherit from AbstractGeom}
 
 \item{width, height}{positive integers. Width and height of the widget.
 By default width=`100\%`, and height varies.}
+
+\item{background}{character, background color such as \code{"#FFFFFF"} or \code{"white"}}
+
+\item{cex}{positive number, relative text magnification level}
+
+\item{timestamp}{logical, whether to show timestamp at the beginning}
 
 \item{side_canvas}{logical, enable side cameras to view objects from fixed perspective}
 
@@ -64,11 +94,11 @@ Only use it when you have multiple widgets in one website}
 
 \item{token}{unique character, internally used to identify widgets in JS localStorage}
 
-\item{optionals}{internally used, to be deprecated}
+\item{controllers}{list to override the settings, for example \code{proxy$get_controllers()}}
 
 \item{browser_external}{logical, use system default browser (default) or builtin one.}
 
-\item{global_data}{internally use, mainly to store orientation matrices.}
+\item{global_data, global_files}{internally use, mainly to store orientation matrices and files.}
 }
 \description{
 Create a Threejs Brain and View it in Browsers

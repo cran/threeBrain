@@ -54,7 +54,8 @@ BrainSurface <- R6::R6Class(
     },
 
     initialize = function(
-      subject_code, surface_type, mesh_type, left_hemisphere, right_hemisphere, position = NULL
+      subject_code, surface_type, mesh_type, left_hemisphere, right_hemisphere,
+      position = NULL
     ){
 
       # right now only supports std.141 and fs mesh_type
@@ -359,8 +360,6 @@ BrainElectrodes <- R6::R6Class(
         el$vertex_number = nearest_vertex
         el$subject_code = subject_code
         el$MNI305_position = mni_305
-        # Add two color schemes
-        el$set_value( value = '', name = '[Hightlight]' )
         el$set_value( value = as.character(subject_code), name = '[Subject]' )
         self$objects[[ row$Electrode ]] = el
       }
@@ -464,6 +463,8 @@ Brain2 <- R6::R6Class(
     #Stores a list of BrainElectrodes objects
     electrodes = NULL,
 
+    misc = NULL,
+
     ## Transforms
 
     # Talairach transform. What freesurfer uses by default is linear transform from scanner coords to MNI305 space
@@ -491,6 +492,12 @@ Brain2 <- R6::R6Class(
       self$surfaces = list()
       self$electrodes = BrainElectrodes$new(subject_code = subject_code)
       self$meta = list()
+
+      # TODO: put all brain global data (transform etc...) here
+      self$misc = BlankGeom$new(
+        group = GeomGroup$new(name = sprintf('_internal_group_data_%s', subject_code)),
+        name = sprintf('_misc_%s', subject_code)
+      )
     },
 
     add_surface = function(surface){
@@ -547,6 +554,23 @@ Brain2 <- R6::R6Class(
       volume$set_subject_code( self$subject_code )
       self$volumes[[ volume$volume_type ]] = volume
 
+    },
+
+    # special: must be cached path
+    add_vertex_color = function(name, path, lazy = TRUE){
+      path = normalizePath(path)
+      self$misc$group$set_group_data(
+        name = name,
+        value = list(
+          path = path,
+          absolute_path = path,
+          file_name = filename(path),
+          is_new_cache = FALSE,
+          is_cache = TRUE,
+          lazy = lazy
+        ),
+        is_cached = TRUE
+      )
     },
 
     set_electrodes = function(electrodes){
@@ -662,7 +686,7 @@ Brain2 <- R6::R6Class(
 
     get_geometries = function(volumes = TRUE, surfaces = TRUE, electrodes = TRUE){
 
-      geoms = list()
+      geoms = list(self$misc)
 
       if( is.logical(volumes) ){
         if(isTRUE(volumes)){ volumes = self$volume_types }else{ volumes = NULL }
@@ -737,11 +761,12 @@ Brain2 <- R6::R6Class(
     },
 
     plot = function( # Elements
-      volumes = TRUE, surfaces = TRUE,
+      volumes = TRUE, surfaces = TRUE, start_zoom = 1, cex = 1,
+      background = '#FFFFFF',
 
       # Layouts
       side_canvas = TRUE, side_width = 250, side_shift = c(0, 0), side_display = TRUE,
-      control_panel = TRUE, default_colormap = NULL,
+      control_panel = TRUE, control_display = TRUE, default_colormap = NULL,
 
       # Legend and color
       palettes = NULL,
@@ -763,6 +788,7 @@ Brain2 <- R6::R6Class(
 
       global_data = self$global_data
 
+
       control_presets = unique(
         c( 'subject2', 'surface_type2', 'hemisphere_material',
            'map_template', 'electrodes', control_presets)
@@ -772,14 +798,19 @@ Brain2 <- R6::R6Class(
         side_display = FALSE
       }
 
+      # # check if curvature files exist
+      # global_files =
+
       threejs_brain(
         .list = geoms,
         symmetric = symmetric, palettes = palettes,
         side_canvas = side_canvas,  side_width = side_width, side_shift = side_shift,
         control_panel = control_panel, control_presets = control_presets,
+        control_display = control_display,
         default_colormap = default_colormap, side_display = side_display,
         width = width, height = height, debug = debug, token = token,
-        browser_external = browser_external, global_data = global_data, ...)
+        browser_external = browser_external, global_data = global_data,
+        start_zoom = start_zoom, cex = cex, background = background, ...)
     }
 
   ),

@@ -71,7 +71,7 @@ GeomGroup <- R6::R6Class(
       }
 
       if(cache_if_not_exists && !is_cached){
-        dir.create(self$cache_path, showWarnings = FALSE, recursive = TRUE)
+        dir_create(self$cache_path)
         # cache file path
         path = file.path(self$cache_path, stringr::str_replace_all(name, '[^\\w.]', '_'))
         if(!file.exists(path)){
@@ -185,7 +185,7 @@ AbstractGeom <- R6::R6Class(
     #   .NotYetImplemented()
     # },
     set_value = function(value = NULL, time_stamp = NULL, name = 'Value', target = '.material.color', ...){
-      stopifnot2(name != '[No Color]', msg = 'name cannot be "[No Color]", it\'s reserved')
+      stopifnot2(name != '[None]', msg = 'name cannot be "[None]", it\'s reserved')
 
       # Check length
       if(length(value) > 1){
