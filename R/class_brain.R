@@ -774,7 +774,9 @@ Brain2 <- R6::R6Class(
       # For control panels = TRUE
       control_presets = NULL,
       # Animation, also needs control panels = TRUE
-      time_range = NULL, value_range = NULL, symmetric = 0,
+      time_range = NULL, val_ranges = NULL, value_alias = NULL,
+
+      value_ranges = val_ranges, controllers = list(),
 
       width = NULL, height = NULL, debug = FALSE, token = NULL, browser_external = TRUE, ... ){
 
@@ -791,7 +793,7 @@ Brain2 <- R6::R6Class(
 
       control_presets = unique(
         c( 'subject2', 'surface_type2', 'hemisphere_material',
-           'map_template', 'electrodes', control_presets)
+           'map_template', 'electrodes', control_presets, 'animation', 'display_highlights')
       )
 
       if( !length(self$volumes) ){
@@ -803,10 +805,10 @@ Brain2 <- R6::R6Class(
 
       threejs_brain(
         .list = geoms,
-        symmetric = symmetric, palettes = palettes,
+        palettes = palettes, controllers = controllers, value_alias = value_alias,
         side_canvas = side_canvas,  side_width = side_width, side_shift = side_shift,
         control_panel = control_panel, control_presets = control_presets,
-        control_display = control_display,
+        control_display = control_display, value_ranges = value_ranges,
         default_colormap = default_colormap, side_display = side_display,
         width = width, height = height, debug = debug, token = token,
         browser_external = browser_external, global_data = global_data,

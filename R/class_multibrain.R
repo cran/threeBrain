@@ -9,8 +9,8 @@
 merge_brain <- function(
   ..., .list = NULL,
   template_surface_types = NULL,
-  template_subject = getOption('threeBrain.template_subject', 'N27'),
-  template_dir = getOption('threeBrain.template_dir', '~/rave_data/others/three_brain')
+  template_subject = unname(getOption('threeBrain.template_subject', 'N27')),
+  template_dir = unname(getOption('threeBrain.template_dir', '~/rave_data/others/three_brain'))
 ){
   MultiBrain2$new( ... , .list = .list, template_subject = template_subject,
                    template_dir = template_dir, template_surface_types = template_surface_types)
@@ -28,11 +28,12 @@ MultiBrain2 <- R6::R6Class(
     # Stores rave-brain
     objects = list(),
 
-    initialize = function(..., .list = NULL,
-                          template_surface_types = NULL,
-                          template_subject = getOption('threeBrain.template_subject', 'N27'),
-                          template_dir = getOption('threeBrain.template_dir', '~/rave_data/others/three_brain'),
-                          use_cache = TRUE, use_141 = getOption('threeBrain.use141', TRUE) ){
+    initialize = function(
+      ..., .list = NULL,
+      template_surface_types = NULL,
+      template_subject = unname(getOption('threeBrain.template_subject', 'N27')),
+      template_dir = unname(getOption('threeBrain.template_dir', '~/rave_data/others/three_brain')),
+      use_cache = TRUE, use_141 = unname(getOption('threeBrain.use141', TRUE)) ){
 
 
       l = unlist( c(list(...), .list) )
@@ -55,10 +56,12 @@ MultiBrain2 <- R6::R6Class(
       }
     },
 
-    alter_template = function(surface_types = NULL,
-                              template_subject = getOption('threeBrain.template_subject', 'N27'),
-                              template_dir = getOption('threeBrain.template_dir', '~/rave_data/others/three_brain'),
-                              use_cache = TRUE, use_141 = getOption('threeBrain.use141', TRUE)){
+    alter_template = function(
+      surface_types = NULL,
+      template_subject = unname(getOption('threeBrain.template_subject', 'N27')),
+      template_dir = unname(getOption('threeBrain.template_dir', '~/rave_data/others/three_brain')),
+      use_cache = TRUE, use_141 = unname(getOption('threeBrain.use141', TRUE))
+    ){
       # test
       template_path = file.path(template_dir, template_subject)
 
@@ -97,10 +100,11 @@ MultiBrain2 <- R6::R6Class(
 
     plot = function(
       additional_subjects = NULL, volumes = TRUE, surfaces = TRUE,
-      symmetric = 0, palettes = NULL,
+      palettes = NULL, val_ranges = NULL, value_alias = NULL,
       side_canvas = TRUE, side_width = 250, side_shift = c(0, 0),
-      control_presets = NULL, control_panel = TRUE,
+      control_presets = NULL, control_panel = TRUE, controllers = list(),
       width = NULL, height = NULL,
+      value_ranges = val_ranges,
       optionals = list(), debug = FALSE, token = NULL, browser_external = TRUE, ...
     ){
 
@@ -127,11 +131,11 @@ MultiBrain2 <- R6::R6Class(
 
       global_data = self$global_data
       control_presets = unique(c('subject2', 'surface_type2', 'hemisphere_material',
-                                 'map_template', 'electrodes', control_presets ))
+                                 'map_template', 'electrodes', control_presets, 'animation', 'display_highlights' ))
 
       threejs_brain(
-        .list = geoms,
-        symmetric = symmetric, palettes = palettes,
+        .list = geoms, controllers = controllers, value_alias = value_alias,
+        palettes = palettes, value_ranges = value_ranges,
         side_canvas = side_canvas, side_width = side_width, side_shift = side_shift,
         control_panel = control_panel, control_presets = control_presets,
         width = width, height = height, debug = debug, token = token,

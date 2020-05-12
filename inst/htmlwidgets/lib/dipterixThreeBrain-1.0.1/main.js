@@ -81,1908 +81,11 @@
 /******/
 /******/
 /******/ 	// Load entry module and return exports
-/******/ 	return __webpack_require__(__webpack_require__.s = 11);
+/******/ 	return __webpack_require__(__webpack_require__.s = 9);
 /******/ })
 /************************************************************************/
 /******/ ([
 /* 0 */
-/***/ (function(module, exports, __webpack_require__) {
-
-/* WEBPACK VAR INJECTION */(function(global, module) {var __WEBPACK_AMD_DEFINE_ARRAY__, __WEBPACK_AMD_DEFINE_RESULT__;//     Underscore.js 1.9.1
-//     http://underscorejs.org
-//     (c) 2009-2018 Jeremy Ashkenas, DocumentCloud and Investigative Reporters & Editors
-//     Underscore may be freely distributed under the MIT license.
-
-(function() {
-
-  // Baseline setup
-  // --------------
-
-  // Establish the root object, `window` (`self`) in the browser, `global`
-  // on the server, or `this` in some virtual machines. We use `self`
-  // instead of `window` for `WebWorker` support.
-  var root = typeof self == 'object' && self.self === self && self ||
-            typeof global == 'object' && global.global === global && global ||
-            this ||
-            {};
-
-  // Save the previous value of the `_` variable.
-  var previousUnderscore = root._;
-
-  // Save bytes in the minified (but not gzipped) version:
-  var ArrayProto = Array.prototype, ObjProto = Object.prototype;
-  var SymbolProto = typeof Symbol !== 'undefined' ? Symbol.prototype : null;
-
-  // Create quick reference variables for speed access to core prototypes.
-  var push = ArrayProto.push,
-      slice = ArrayProto.slice,
-      toString = ObjProto.toString,
-      hasOwnProperty = ObjProto.hasOwnProperty;
-
-  // All **ECMAScript 5** native function implementations that we hope to use
-  // are declared here.
-  var nativeIsArray = Array.isArray,
-      nativeKeys = Object.keys,
-      nativeCreate = Object.create;
-
-  // Naked function reference for surrogate-prototype-swapping.
-  var Ctor = function(){};
-
-  // Create a safe reference to the Underscore object for use below.
-  var _ = function(obj) {
-    if (obj instanceof _) return obj;
-    if (!(this instanceof _)) return new _(obj);
-    this._wrapped = obj;
-  };
-
-  // Export the Underscore object for **Node.js**, with
-  // backwards-compatibility for their old module API. If we're in
-  // the browser, add `_` as a global object.
-  // (`nodeType` is checked to ensure that `module`
-  // and `exports` are not HTML elements.)
-  if ( true && !exports.nodeType) {
-    if ( true && !module.nodeType && module.exports) {
-      exports = module.exports = _;
-    }
-    exports._ = _;
-  } else {
-    root._ = _;
-  }
-
-  // Current version.
-  _.VERSION = '1.9.1';
-
-  // Internal function that returns an efficient (for current engines) version
-  // of the passed-in callback, to be repeatedly applied in other Underscore
-  // functions.
-  var optimizeCb = function(func, context, argCount) {
-    if (context === void 0) return func;
-    switch (argCount == null ? 3 : argCount) {
-      case 1: return function(value) {
-        return func.call(context, value);
-      };
-      // The 2-argument case is omitted because we’re not using it.
-      case 3: return function(value, index, collection) {
-        return func.call(context, value, index, collection);
-      };
-      case 4: return function(accumulator, value, index, collection) {
-        return func.call(context, accumulator, value, index, collection);
-      };
-    }
-    return function() {
-      return func.apply(context, arguments);
-    };
-  };
-
-  var builtinIteratee;
-
-  // An internal function to generate callbacks that can be applied to each
-  // element in a collection, returning the desired result — either `identity`,
-  // an arbitrary callback, a property matcher, or a property accessor.
-  var cb = function(value, context, argCount) {
-    if (_.iteratee !== builtinIteratee) return _.iteratee(value, context);
-    if (value == null) return _.identity;
-    if (_.isFunction(value)) return optimizeCb(value, context, argCount);
-    if (_.isObject(value) && !_.isArray(value)) return _.matcher(value);
-    return _.property(value);
-  };
-
-  // External wrapper for our callback generator. Users may customize
-  // `_.iteratee` if they want additional predicate/iteratee shorthand styles.
-  // This abstraction hides the internal-only argCount argument.
-  _.iteratee = builtinIteratee = function(value, context) {
-    return cb(value, context, Infinity);
-  };
-
-  // Some functions take a variable number of arguments, or a few expected
-  // arguments at the beginning and then a variable number of values to operate
-  // on. This helper accumulates all remaining arguments past the function’s
-  // argument length (or an explicit `startIndex`), into an array that becomes
-  // the last argument. Similar to ES6’s "rest parameter".
-  var restArguments = function(func, startIndex) {
-    startIndex = startIndex == null ? func.length - 1 : +startIndex;
-    return function() {
-      var length = Math.max(arguments.length - startIndex, 0),
-          rest = Array(length),
-          index = 0;
-      for (; index < length; index++) {
-        rest[index] = arguments[index + startIndex];
-      }
-      switch (startIndex) {
-        case 0: return func.call(this, rest);
-        case 1: return func.call(this, arguments[0], rest);
-        case 2: return func.call(this, arguments[0], arguments[1], rest);
-      }
-      var args = Array(startIndex + 1);
-      for (index = 0; index < startIndex; index++) {
-        args[index] = arguments[index];
-      }
-      args[startIndex] = rest;
-      return func.apply(this, args);
-    };
-  };
-
-  // An internal function for creating a new object that inherits from another.
-  var baseCreate = function(prototype) {
-    if (!_.isObject(prototype)) return {};
-    if (nativeCreate) return nativeCreate(prototype);
-    Ctor.prototype = prototype;
-    var result = new Ctor;
-    Ctor.prototype = null;
-    return result;
-  };
-
-  var shallowProperty = function(key) {
-    return function(obj) {
-      return obj == null ? void 0 : obj[key];
-    };
-  };
-
-  var has = function(obj, path) {
-    return obj != null && hasOwnProperty.call(obj, path);
-  }
-
-  var deepGet = function(obj, path) {
-    var length = path.length;
-    for (var i = 0; i < length; i++) {
-      if (obj == null) return void 0;
-      obj = obj[path[i]];
-    }
-    return length ? obj : void 0;
-  };
-
-  // Helper for collection methods to determine whether a collection
-  // should be iterated as an array or as an object.
-  // Related: http://people.mozilla.org/~jorendorff/es6-draft.html#sec-tolength
-  // Avoids a very nasty iOS 8 JIT bug on ARM-64. #2094
-  var MAX_ARRAY_INDEX = Math.pow(2, 53) - 1;
-  var getLength = shallowProperty('length');
-  var isArrayLike = function(collection) {
-    var length = getLength(collection);
-    return typeof length == 'number' && length >= 0 && length <= MAX_ARRAY_INDEX;
-  };
-
-  // Collection Functions
-  // --------------------
-
-  // The cornerstone, an `each` implementation, aka `forEach`.
-  // Handles raw objects in addition to array-likes. Treats all
-  // sparse array-likes as if they were dense.
-  _.each = _.forEach = function(obj, iteratee, context) {
-    iteratee = optimizeCb(iteratee, context);
-    var i, length;
-    if (isArrayLike(obj)) {
-      for (i = 0, length = obj.length; i < length; i++) {
-        iteratee(obj[i], i, obj);
-      }
-    } else {
-      var keys = _.keys(obj);
-      for (i = 0, length = keys.length; i < length; i++) {
-        iteratee(obj[keys[i]], keys[i], obj);
-      }
-    }
-    return obj;
-  };
-
-  // Return the results of applying the iteratee to each element.
-  _.map = _.collect = function(obj, iteratee, context) {
-    iteratee = cb(iteratee, context);
-    var keys = !isArrayLike(obj) && _.keys(obj),
-        length = (keys || obj).length,
-        results = Array(length);
-    for (var index = 0; index < length; index++) {
-      var currentKey = keys ? keys[index] : index;
-      results[index] = iteratee(obj[currentKey], currentKey, obj);
-    }
-    return results;
-  };
-
-  // Create a reducing function iterating left or right.
-  var createReduce = function(dir) {
-    // Wrap code that reassigns argument variables in a separate function than
-    // the one that accesses `arguments.length` to avoid a perf hit. (#1991)
-    var reducer = function(obj, iteratee, memo, initial) {
-      var keys = !isArrayLike(obj) && _.keys(obj),
-          length = (keys || obj).length,
-          index = dir > 0 ? 0 : length - 1;
-      if (!initial) {
-        memo = obj[keys ? keys[index] : index];
-        index += dir;
-      }
-      for (; index >= 0 && index < length; index += dir) {
-        var currentKey = keys ? keys[index] : index;
-        memo = iteratee(memo, obj[currentKey], currentKey, obj);
-      }
-      return memo;
-    };
-
-    return function(obj, iteratee, memo, context) {
-      var initial = arguments.length >= 3;
-      return reducer(obj, optimizeCb(iteratee, context, 4), memo, initial);
-    };
-  };
-
-  // **Reduce** builds up a single result from a list of values, aka `inject`,
-  // or `foldl`.
-  _.reduce = _.foldl = _.inject = createReduce(1);
-
-  // The right-associative version of reduce, also known as `foldr`.
-  _.reduceRight = _.foldr = createReduce(-1);
-
-  // Return the first value which passes a truth test. Aliased as `detect`.
-  _.find = _.detect = function(obj, predicate, context) {
-    var keyFinder = isArrayLike(obj) ? _.findIndex : _.findKey;
-    var key = keyFinder(obj, predicate, context);
-    if (key !== void 0 && key !== -1) return obj[key];
-  };
-
-  // Return all the elements that pass a truth test.
-  // Aliased as `select`.
-  _.filter = _.select = function(obj, predicate, context) {
-    var results = [];
-    predicate = cb(predicate, context);
-    _.each(obj, function(value, index, list) {
-      if (predicate(value, index, list)) results.push(value);
-    });
-    return results;
-  };
-
-  // Return all the elements for which a truth test fails.
-  _.reject = function(obj, predicate, context) {
-    return _.filter(obj, _.negate(cb(predicate)), context);
-  };
-
-  // Determine whether all of the elements match a truth test.
-  // Aliased as `all`.
-  _.every = _.all = function(obj, predicate, context) {
-    predicate = cb(predicate, context);
-    var keys = !isArrayLike(obj) && _.keys(obj),
-        length = (keys || obj).length;
-    for (var index = 0; index < length; index++) {
-      var currentKey = keys ? keys[index] : index;
-      if (!predicate(obj[currentKey], currentKey, obj)) return false;
-    }
-    return true;
-  };
-
-  // Determine if at least one element in the object matches a truth test.
-  // Aliased as `any`.
-  _.some = _.any = function(obj, predicate, context) {
-    predicate = cb(predicate, context);
-    var keys = !isArrayLike(obj) && _.keys(obj),
-        length = (keys || obj).length;
-    for (var index = 0; index < length; index++) {
-      var currentKey = keys ? keys[index] : index;
-      if (predicate(obj[currentKey], currentKey, obj)) return true;
-    }
-    return false;
-  };
-
-  // Determine if the array or object contains a given item (using `===`).
-  // Aliased as `includes` and `include`.
-  _.contains = _.includes = _.include = function(obj, item, fromIndex, guard) {
-    if (!isArrayLike(obj)) obj = _.values(obj);
-    if (typeof fromIndex != 'number' || guard) fromIndex = 0;
-    return _.indexOf(obj, item, fromIndex) >= 0;
-  };
-
-  // Invoke a method (with arguments) on every item in a collection.
-  _.invoke = restArguments(function(obj, path, args) {
-    var contextPath, func;
-    if (_.isFunction(path)) {
-      func = path;
-    } else if (_.isArray(path)) {
-      contextPath = path.slice(0, -1);
-      path = path[path.length - 1];
-    }
-    return _.map(obj, function(context) {
-      var method = func;
-      if (!method) {
-        if (contextPath && contextPath.length) {
-          context = deepGet(context, contextPath);
-        }
-        if (context == null) return void 0;
-        method = context[path];
-      }
-      return method == null ? method : method.apply(context, args);
-    });
-  });
-
-  // Convenience version of a common use case of `map`: fetching a property.
-  _.pluck = function(obj, key) {
-    return _.map(obj, _.property(key));
-  };
-
-  // Convenience version of a common use case of `filter`: selecting only objects
-  // containing specific `key:value` pairs.
-  _.where = function(obj, attrs) {
-    return _.filter(obj, _.matcher(attrs));
-  };
-
-  // Convenience version of a common use case of `find`: getting the first object
-  // containing specific `key:value` pairs.
-  _.findWhere = function(obj, attrs) {
-    return _.find(obj, _.matcher(attrs));
-  };
-
-  // Return the maximum element (or element-based computation).
-  _.max = function(obj, iteratee, context) {
-    var result = -Infinity, lastComputed = -Infinity,
-        value, computed;
-    if (iteratee == null || typeof iteratee == 'number' && typeof obj[0] != 'object' && obj != null) {
-      obj = isArrayLike(obj) ? obj : _.values(obj);
-      for (var i = 0, length = obj.length; i < length; i++) {
-        value = obj[i];
-        if (value != null && value > result) {
-          result = value;
-        }
-      }
-    } else {
-      iteratee = cb(iteratee, context);
-      _.each(obj, function(v, index, list) {
-        computed = iteratee(v, index, list);
-        if (computed > lastComputed || computed === -Infinity && result === -Infinity) {
-          result = v;
-          lastComputed = computed;
-        }
-      });
-    }
-    return result;
-  };
-
-  // Return the minimum element (or element-based computation).
-  _.min = function(obj, iteratee, context) {
-    var result = Infinity, lastComputed = Infinity,
-        value, computed;
-    if (iteratee == null || typeof iteratee == 'number' && typeof obj[0] != 'object' && obj != null) {
-      obj = isArrayLike(obj) ? obj : _.values(obj);
-      for (var i = 0, length = obj.length; i < length; i++) {
-        value = obj[i];
-        if (value != null && value < result) {
-          result = value;
-        }
-      }
-    } else {
-      iteratee = cb(iteratee, context);
-      _.each(obj, function(v, index, list) {
-        computed = iteratee(v, index, list);
-        if (computed < lastComputed || computed === Infinity && result === Infinity) {
-          result = v;
-          lastComputed = computed;
-        }
-      });
-    }
-    return result;
-  };
-
-  // Shuffle a collection.
-  _.shuffle = function(obj) {
-    return _.sample(obj, Infinity);
-  };
-
-  // Sample **n** random values from a collection using the modern version of the
-  // [Fisher-Yates shuffle](http://en.wikipedia.org/wiki/Fisher–Yates_shuffle).
-  // If **n** is not specified, returns a single random element.
-  // The internal `guard` argument allows it to work with `map`.
-  _.sample = function(obj, n, guard) {
-    if (n == null || guard) {
-      if (!isArrayLike(obj)) obj = _.values(obj);
-      return obj[_.random(obj.length - 1)];
-    }
-    var sample = isArrayLike(obj) ? _.clone(obj) : _.values(obj);
-    var length = getLength(sample);
-    n = Math.max(Math.min(n, length), 0);
-    var last = length - 1;
-    for (var index = 0; index < n; index++) {
-      var rand = _.random(index, last);
-      var temp = sample[index];
-      sample[index] = sample[rand];
-      sample[rand] = temp;
-    }
-    return sample.slice(0, n);
-  };
-
-  // Sort the object's values by a criterion produced by an iteratee.
-  _.sortBy = function(obj, iteratee, context) {
-    var index = 0;
-    iteratee = cb(iteratee, context);
-    return _.pluck(_.map(obj, function(value, key, list) {
-      return {
-        value: value,
-        index: index++,
-        criteria: iteratee(value, key, list)
-      };
-    }).sort(function(left, right) {
-      var a = left.criteria;
-      var b = right.criteria;
-      if (a !== b) {
-        if (a > b || a === void 0) return 1;
-        if (a < b || b === void 0) return -1;
-      }
-      return left.index - right.index;
-    }), 'value');
-  };
-
-  // An internal function used for aggregate "group by" operations.
-  var group = function(behavior, partition) {
-    return function(obj, iteratee, context) {
-      var result = partition ? [[], []] : {};
-      iteratee = cb(iteratee, context);
-      _.each(obj, function(value, index) {
-        var key = iteratee(value, index, obj);
-        behavior(result, value, key);
-      });
-      return result;
-    };
-  };
-
-  // Groups the object's values by a criterion. Pass either a string attribute
-  // to group by, or a function that returns the criterion.
-  _.groupBy = group(function(result, value, key) {
-    if (has(result, key)) result[key].push(value); else result[key] = [value];
-  });
-
-  // Indexes the object's values by a criterion, similar to `groupBy`, but for
-  // when you know that your index values will be unique.
-  _.indexBy = group(function(result, value, key) {
-    result[key] = value;
-  });
-
-  // Counts instances of an object that group by a certain criterion. Pass
-  // either a string attribute to count by, or a function that returns the
-  // criterion.
-  _.countBy = group(function(result, value, key) {
-    if (has(result, key)) result[key]++; else result[key] = 1;
-  });
-
-  var reStrSymbol = /[^\ud800-\udfff]|[\ud800-\udbff][\udc00-\udfff]|[\ud800-\udfff]/g;
-  // Safely create a real, live array from anything iterable.
-  _.toArray = function(obj) {
-    if (!obj) return [];
-    if (_.isArray(obj)) return slice.call(obj);
-    if (_.isString(obj)) {
-      // Keep surrogate pair characters together
-      return obj.match(reStrSymbol);
-    }
-    if (isArrayLike(obj)) return _.map(obj, _.identity);
-    return _.values(obj);
-  };
-
-  // Return the number of elements in an object.
-  _.size = function(obj) {
-    if (obj == null) return 0;
-    return isArrayLike(obj) ? obj.length : _.keys(obj).length;
-  };
-
-  // Split a collection into two arrays: one whose elements all satisfy the given
-  // predicate, and one whose elements all do not satisfy the predicate.
-  _.partition = group(function(result, value, pass) {
-    result[pass ? 0 : 1].push(value);
-  }, true);
-
-  // Array Functions
-  // ---------------
-
-  // Get the first element of an array. Passing **n** will return the first N
-  // values in the array. Aliased as `head` and `take`. The **guard** check
-  // allows it to work with `_.map`.
-  _.first = _.head = _.take = function(array, n, guard) {
-    if (array == null || array.length < 1) return n == null ? void 0 : [];
-    if (n == null || guard) return array[0];
-    return _.initial(array, array.length - n);
-  };
-
-  // Returns everything but the last entry of the array. Especially useful on
-  // the arguments object. Passing **n** will return all the values in
-  // the array, excluding the last N.
-  _.initial = function(array, n, guard) {
-    return slice.call(array, 0, Math.max(0, array.length - (n == null || guard ? 1 : n)));
-  };
-
-  // Get the last element of an array. Passing **n** will return the last N
-  // values in the array.
-  _.last = function(array, n, guard) {
-    if (array == null || array.length < 1) return n == null ? void 0 : [];
-    if (n == null || guard) return array[array.length - 1];
-    return _.rest(array, Math.max(0, array.length - n));
-  };
-
-  // Returns everything but the first entry of the array. Aliased as `tail` and `drop`.
-  // Especially useful on the arguments object. Passing an **n** will return
-  // the rest N values in the array.
-  _.rest = _.tail = _.drop = function(array, n, guard) {
-    return slice.call(array, n == null || guard ? 1 : n);
-  };
-
-  // Trim out all falsy values from an array.
-  _.compact = function(array) {
-    return _.filter(array, Boolean);
-  };
-
-  // Internal implementation of a recursive `flatten` function.
-  var flatten = function(input, shallow, strict, output) {
-    output = output || [];
-    var idx = output.length;
-    for (var i = 0, length = getLength(input); i < length; i++) {
-      var value = input[i];
-      if (isArrayLike(value) && (_.isArray(value) || _.isArguments(value))) {
-        // Flatten current level of array or arguments object.
-        if (shallow) {
-          var j = 0, len = value.length;
-          while (j < len) output[idx++] = value[j++];
-        } else {
-          flatten(value, shallow, strict, output);
-          idx = output.length;
-        }
-      } else if (!strict) {
-        output[idx++] = value;
-      }
-    }
-    return output;
-  };
-
-  // Flatten out an array, either recursively (by default), or just one level.
-  _.flatten = function(array, shallow) {
-    return flatten(array, shallow, false);
-  };
-
-  // Return a version of the array that does not contain the specified value(s).
-  _.without = restArguments(function(array, otherArrays) {
-    return _.difference(array, otherArrays);
-  });
-
-  // Produce a duplicate-free version of the array. If the array has already
-  // been sorted, you have the option of using a faster algorithm.
-  // The faster algorithm will not work with an iteratee if the iteratee
-  // is not a one-to-one function, so providing an iteratee will disable
-  // the faster algorithm.
-  // Aliased as `unique`.
-  _.uniq = _.unique = function(array, isSorted, iteratee, context) {
-    if (!_.isBoolean(isSorted)) {
-      context = iteratee;
-      iteratee = isSorted;
-      isSorted = false;
-    }
-    if (iteratee != null) iteratee = cb(iteratee, context);
-    var result = [];
-    var seen = [];
-    for (var i = 0, length = getLength(array); i < length; i++) {
-      var value = array[i],
-          computed = iteratee ? iteratee(value, i, array) : value;
-      if (isSorted && !iteratee) {
-        if (!i || seen !== computed) result.push(value);
-        seen = computed;
-      } else if (iteratee) {
-        if (!_.contains(seen, computed)) {
-          seen.push(computed);
-          result.push(value);
-        }
-      } else if (!_.contains(result, value)) {
-        result.push(value);
-      }
-    }
-    return result;
-  };
-
-  // Produce an array that contains the union: each distinct element from all of
-  // the passed-in arrays.
-  _.union = restArguments(function(arrays) {
-    return _.uniq(flatten(arrays, true, true));
-  });
-
-  // Produce an array that contains every item shared between all the
-  // passed-in arrays.
-  _.intersection = function(array) {
-    var result = [];
-    var argsLength = arguments.length;
-    for (var i = 0, length = getLength(array); i < length; i++) {
-      var item = array[i];
-      if (_.contains(result, item)) continue;
-      var j;
-      for (j = 1; j < argsLength; j++) {
-        if (!_.contains(arguments[j], item)) break;
-      }
-      if (j === argsLength) result.push(item);
-    }
-    return result;
-  };
-
-  // Take the difference between one array and a number of other arrays.
-  // Only the elements present in just the first array will remain.
-  _.difference = restArguments(function(array, rest) {
-    rest = flatten(rest, true, true);
-    return _.filter(array, function(value){
-      return !_.contains(rest, value);
-    });
-  });
-
-  // Complement of _.zip. Unzip accepts an array of arrays and groups
-  // each array's elements on shared indices.
-  _.unzip = function(array) {
-    var length = array && _.max(array, getLength).length || 0;
-    var result = Array(length);
-
-    for (var index = 0; index < length; index++) {
-      result[index] = _.pluck(array, index);
-    }
-    return result;
-  };
-
-  // Zip together multiple lists into a single array -- elements that share
-  // an index go together.
-  _.zip = restArguments(_.unzip);
-
-  // Converts lists into objects. Pass either a single array of `[key, value]`
-  // pairs, or two parallel arrays of the same length -- one of keys, and one of
-  // the corresponding values. Passing by pairs is the reverse of _.pairs.
-  _.object = function(list, values) {
-    var result = {};
-    for (var i = 0, length = getLength(list); i < length; i++) {
-      if (values) {
-        result[list[i]] = values[i];
-      } else {
-        result[list[i][0]] = list[i][1];
-      }
-    }
-    return result;
-  };
-
-  // Generator function to create the findIndex and findLastIndex functions.
-  var createPredicateIndexFinder = function(dir) {
-    return function(array, predicate, context) {
-      predicate = cb(predicate, context);
-      var length = getLength(array);
-      var index = dir > 0 ? 0 : length - 1;
-      for (; index >= 0 && index < length; index += dir) {
-        if (predicate(array[index], index, array)) return index;
-      }
-      return -1;
-    };
-  };
-
-  // Returns the first index on an array-like that passes a predicate test.
-  _.findIndex = createPredicateIndexFinder(1);
-  _.findLastIndex = createPredicateIndexFinder(-1);
-
-  // Use a comparator function to figure out the smallest index at which
-  // an object should be inserted so as to maintain order. Uses binary search.
-  _.sortedIndex = function(array, obj, iteratee, context) {
-    iteratee = cb(iteratee, context, 1);
-    var value = iteratee(obj);
-    var low = 0, high = getLength(array);
-    while (low < high) {
-      var mid = Math.floor((low + high) / 2);
-      if (iteratee(array[mid]) < value) low = mid + 1; else high = mid;
-    }
-    return low;
-  };
-
-  // Generator function to create the indexOf and lastIndexOf functions.
-  var createIndexFinder = function(dir, predicateFind, sortedIndex) {
-    return function(array, item, idx) {
-      var i = 0, length = getLength(array);
-      if (typeof idx == 'number') {
-        if (dir > 0) {
-          i = idx >= 0 ? idx : Math.max(idx + length, i);
-        } else {
-          length = idx >= 0 ? Math.min(idx + 1, length) : idx + length + 1;
-        }
-      } else if (sortedIndex && idx && length) {
-        idx = sortedIndex(array, item);
-        return array[idx] === item ? idx : -1;
-      }
-      if (item !== item) {
-        idx = predicateFind(slice.call(array, i, length), _.isNaN);
-        return idx >= 0 ? idx + i : -1;
-      }
-      for (idx = dir > 0 ? i : length - 1; idx >= 0 && idx < length; idx += dir) {
-        if (array[idx] === item) return idx;
-      }
-      return -1;
-    };
-  };
-
-  // Return the position of the first occurrence of an item in an array,
-  // or -1 if the item is not included in the array.
-  // If the array is large and already in sort order, pass `true`
-  // for **isSorted** to use binary search.
-  _.indexOf = createIndexFinder(1, _.findIndex, _.sortedIndex);
-  _.lastIndexOf = createIndexFinder(-1, _.findLastIndex);
-
-  // Generate an integer Array containing an arithmetic progression. A port of
-  // the native Python `range()` function. See
-  // [the Python documentation](http://docs.python.org/library/functions.html#range).
-  _.range = function(start, stop, step) {
-    if (stop == null) {
-      stop = start || 0;
-      start = 0;
-    }
-    if (!step) {
-      step = stop < start ? -1 : 1;
-    }
-
-    var length = Math.max(Math.ceil((stop - start) / step), 0);
-    var range = Array(length);
-
-    for (var idx = 0; idx < length; idx++, start += step) {
-      range[idx] = start;
-    }
-
-    return range;
-  };
-
-  // Chunk a single array into multiple arrays, each containing `count` or fewer
-  // items.
-  _.chunk = function(array, count) {
-    if (count == null || count < 1) return [];
-    var result = [];
-    var i = 0, length = array.length;
-    while (i < length) {
-      result.push(slice.call(array, i, i += count));
-    }
-    return result;
-  };
-
-  // Function (ahem) Functions
-  // ------------------
-
-  // Determines whether to execute a function as a constructor
-  // or a normal function with the provided arguments.
-  var executeBound = function(sourceFunc, boundFunc, context, callingContext, args) {
-    if (!(callingContext instanceof boundFunc)) return sourceFunc.apply(context, args);
-    var self = baseCreate(sourceFunc.prototype);
-    var result = sourceFunc.apply(self, args);
-    if (_.isObject(result)) return result;
-    return self;
-  };
-
-  // Create a function bound to a given object (assigning `this`, and arguments,
-  // optionally). Delegates to **ECMAScript 5**'s native `Function.bind` if
-  // available.
-  _.bind = restArguments(function(func, context, args) {
-    if (!_.isFunction(func)) throw new TypeError('Bind must be called on a function');
-    var bound = restArguments(function(callArgs) {
-      return executeBound(func, bound, context, this, args.concat(callArgs));
-    });
-    return bound;
-  });
-
-  // Partially apply a function by creating a version that has had some of its
-  // arguments pre-filled, without changing its dynamic `this` context. _ acts
-  // as a placeholder by default, allowing any combination of arguments to be
-  // pre-filled. Set `_.partial.placeholder` for a custom placeholder argument.
-  _.partial = restArguments(function(func, boundArgs) {
-    var placeholder = _.partial.placeholder;
-    var bound = function() {
-      var position = 0, length = boundArgs.length;
-      var args = Array(length);
-      for (var i = 0; i < length; i++) {
-        args[i] = boundArgs[i] === placeholder ? arguments[position++] : boundArgs[i];
-      }
-      while (position < arguments.length) args.push(arguments[position++]);
-      return executeBound(func, bound, this, this, args);
-    };
-    return bound;
-  });
-
-  _.partial.placeholder = _;
-
-  // Bind a number of an object's methods to that object. Remaining arguments
-  // are the method names to be bound. Useful for ensuring that all callbacks
-  // defined on an object belong to it.
-  _.bindAll = restArguments(function(obj, keys) {
-    keys = flatten(keys, false, false);
-    var index = keys.length;
-    if (index < 1) throw new Error('bindAll must be passed function names');
-    while (index--) {
-      var key = keys[index];
-      obj[key] = _.bind(obj[key], obj);
-    }
-  });
-
-  // Memoize an expensive function by storing its results.
-  _.memoize = function(func, hasher) {
-    var memoize = function(key) {
-      var cache = memoize.cache;
-      var address = '' + (hasher ? hasher.apply(this, arguments) : key);
-      if (!has(cache, address)) cache[address] = func.apply(this, arguments);
-      return cache[address];
-    };
-    memoize.cache = {};
-    return memoize;
-  };
-
-  // Delays a function for the given number of milliseconds, and then calls
-  // it with the arguments supplied.
-  _.delay = restArguments(function(func, wait, args) {
-    return setTimeout(function() {
-      return func.apply(null, args);
-    }, wait);
-  });
-
-  // Defers a function, scheduling it to run after the current call stack has
-  // cleared.
-  _.defer = _.partial(_.delay, _, 1);
-
-  // Returns a function, that, when invoked, will only be triggered at most once
-  // during a given window of time. Normally, the throttled function will run
-  // as much as it can, without ever going more than once per `wait` duration;
-  // but if you'd like to disable the execution on the leading edge, pass
-  // `{leading: false}`. To disable execution on the trailing edge, ditto.
-  _.throttle = function(func, wait, options) {
-    var timeout, context, args, result;
-    var previous = 0;
-    if (!options) options = {};
-
-    var later = function() {
-      previous = options.leading === false ? 0 : _.now();
-      timeout = null;
-      result = func.apply(context, args);
-      if (!timeout) context = args = null;
-    };
-
-    var throttled = function() {
-      var now = _.now();
-      if (!previous && options.leading === false) previous = now;
-      var remaining = wait - (now - previous);
-      context = this;
-      args = arguments;
-      if (remaining <= 0 || remaining > wait) {
-        if (timeout) {
-          clearTimeout(timeout);
-          timeout = null;
-        }
-        previous = now;
-        result = func.apply(context, args);
-        if (!timeout) context = args = null;
-      } else if (!timeout && options.trailing !== false) {
-        timeout = setTimeout(later, remaining);
-      }
-      return result;
-    };
-
-    throttled.cancel = function() {
-      clearTimeout(timeout);
-      previous = 0;
-      timeout = context = args = null;
-    };
-
-    return throttled;
-  };
-
-  // Returns a function, that, as long as it continues to be invoked, will not
-  // be triggered. The function will be called after it stops being called for
-  // N milliseconds. If `immediate` is passed, trigger the function on the
-  // leading edge, instead of the trailing.
-  _.debounce = function(func, wait, immediate) {
-    var timeout, result;
-
-    var later = function(context, args) {
-      timeout = null;
-      if (args) result = func.apply(context, args);
-    };
-
-    var debounced = restArguments(function(args) {
-      if (timeout) clearTimeout(timeout);
-      if (immediate) {
-        var callNow = !timeout;
-        timeout = setTimeout(later, wait);
-        if (callNow) result = func.apply(this, args);
-      } else {
-        timeout = _.delay(later, wait, this, args);
-      }
-
-      return result;
-    });
-
-    debounced.cancel = function() {
-      clearTimeout(timeout);
-      timeout = null;
-    };
-
-    return debounced;
-  };
-
-  // Returns the first function passed as an argument to the second,
-  // allowing you to adjust arguments, run code before and after, and
-  // conditionally execute the original function.
-  _.wrap = function(func, wrapper) {
-    return _.partial(wrapper, func);
-  };
-
-  // Returns a negated version of the passed-in predicate.
-  _.negate = function(predicate) {
-    return function() {
-      return !predicate.apply(this, arguments);
-    };
-  };
-
-  // Returns a function that is the composition of a list of functions, each
-  // consuming the return value of the function that follows.
-  _.compose = function() {
-    var args = arguments;
-    var start = args.length - 1;
-    return function() {
-      var i = start;
-      var result = args[start].apply(this, arguments);
-      while (i--) result = args[i].call(this, result);
-      return result;
-    };
-  };
-
-  // Returns a function that will only be executed on and after the Nth call.
-  _.after = function(times, func) {
-    return function() {
-      if (--times < 1) {
-        return func.apply(this, arguments);
-      }
-    };
-  };
-
-  // Returns a function that will only be executed up to (but not including) the Nth call.
-  _.before = function(times, func) {
-    var memo;
-    return function() {
-      if (--times > 0) {
-        memo = func.apply(this, arguments);
-      }
-      if (times <= 1) func = null;
-      return memo;
-    };
-  };
-
-  // Returns a function that will be executed at most one time, no matter how
-  // often you call it. Useful for lazy initialization.
-  _.once = _.partial(_.before, 2);
-
-  _.restArguments = restArguments;
-
-  // Object Functions
-  // ----------------
-
-  // Keys in IE < 9 that won't be iterated by `for key in ...` and thus missed.
-  var hasEnumBug = !{toString: null}.propertyIsEnumerable('toString');
-  var nonEnumerableProps = ['valueOf', 'isPrototypeOf', 'toString',
-    'propertyIsEnumerable', 'hasOwnProperty', 'toLocaleString'];
-
-  var collectNonEnumProps = function(obj, keys) {
-    var nonEnumIdx = nonEnumerableProps.length;
-    var constructor = obj.constructor;
-    var proto = _.isFunction(constructor) && constructor.prototype || ObjProto;
-
-    // Constructor is a special case.
-    var prop = 'constructor';
-    if (has(obj, prop) && !_.contains(keys, prop)) keys.push(prop);
-
-    while (nonEnumIdx--) {
-      prop = nonEnumerableProps[nonEnumIdx];
-      if (prop in obj && obj[prop] !== proto[prop] && !_.contains(keys, prop)) {
-        keys.push(prop);
-      }
-    }
-  };
-
-  // Retrieve the names of an object's own properties.
-  // Delegates to **ECMAScript 5**'s native `Object.keys`.
-  _.keys = function(obj) {
-    if (!_.isObject(obj)) return [];
-    if (nativeKeys) return nativeKeys(obj);
-    var keys = [];
-    for (var key in obj) if (has(obj, key)) keys.push(key);
-    // Ahem, IE < 9.
-    if (hasEnumBug) collectNonEnumProps(obj, keys);
-    return keys;
-  };
-
-  // Retrieve all the property names of an object.
-  _.allKeys = function(obj) {
-    if (!_.isObject(obj)) return [];
-    var keys = [];
-    for (var key in obj) keys.push(key);
-    // Ahem, IE < 9.
-    if (hasEnumBug) collectNonEnumProps(obj, keys);
-    return keys;
-  };
-
-  // Retrieve the values of an object's properties.
-  _.values = function(obj) {
-    var keys = _.keys(obj);
-    var length = keys.length;
-    var values = Array(length);
-    for (var i = 0; i < length; i++) {
-      values[i] = obj[keys[i]];
-    }
-    return values;
-  };
-
-  // Returns the results of applying the iteratee to each element of the object.
-  // In contrast to _.map it returns an object.
-  _.mapObject = function(obj, iteratee, context) {
-    iteratee = cb(iteratee, context);
-    var keys = _.keys(obj),
-        length = keys.length,
-        results = {};
-    for (var index = 0; index < length; index++) {
-      var currentKey = keys[index];
-      results[currentKey] = iteratee(obj[currentKey], currentKey, obj);
-    }
-    return results;
-  };
-
-  // Convert an object into a list of `[key, value]` pairs.
-  // The opposite of _.object.
-  _.pairs = function(obj) {
-    var keys = _.keys(obj);
-    var length = keys.length;
-    var pairs = Array(length);
-    for (var i = 0; i < length; i++) {
-      pairs[i] = [keys[i], obj[keys[i]]];
-    }
-    return pairs;
-  };
-
-  // Invert the keys and values of an object. The values must be serializable.
-  _.invert = function(obj) {
-    var result = {};
-    var keys = _.keys(obj);
-    for (var i = 0, length = keys.length; i < length; i++) {
-      result[obj[keys[i]]] = keys[i];
-    }
-    return result;
-  };
-
-  // Return a sorted list of the function names available on the object.
-  // Aliased as `methods`.
-  _.functions = _.methods = function(obj) {
-    var names = [];
-    for (var key in obj) {
-      if (_.isFunction(obj[key])) names.push(key);
-    }
-    return names.sort();
-  };
-
-  // An internal function for creating assigner functions.
-  var createAssigner = function(keysFunc, defaults) {
-    return function(obj) {
-      var length = arguments.length;
-      if (defaults) obj = Object(obj);
-      if (length < 2 || obj == null) return obj;
-      for (var index = 1; index < length; index++) {
-        var source = arguments[index],
-            keys = keysFunc(source),
-            l = keys.length;
-        for (var i = 0; i < l; i++) {
-          var key = keys[i];
-          if (!defaults || obj[key] === void 0) obj[key] = source[key];
-        }
-      }
-      return obj;
-    };
-  };
-
-  // Extend a given object with all the properties in passed-in object(s).
-  _.extend = createAssigner(_.allKeys);
-
-  // Assigns a given object with all the own properties in the passed-in object(s).
-  // (https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Object/assign)
-  _.extendOwn = _.assign = createAssigner(_.keys);
-
-  // Returns the first key on an object that passes a predicate test.
-  _.findKey = function(obj, predicate, context) {
-    predicate = cb(predicate, context);
-    var keys = _.keys(obj), key;
-    for (var i = 0, length = keys.length; i < length; i++) {
-      key = keys[i];
-      if (predicate(obj[key], key, obj)) return key;
-    }
-  };
-
-  // Internal pick helper function to determine if `obj` has key `key`.
-  var keyInObj = function(value, key, obj) {
-    return key in obj;
-  };
-
-  // Return a copy of the object only containing the whitelisted properties.
-  _.pick = restArguments(function(obj, keys) {
-    var result = {}, iteratee = keys[0];
-    if (obj == null) return result;
-    if (_.isFunction(iteratee)) {
-      if (keys.length > 1) iteratee = optimizeCb(iteratee, keys[1]);
-      keys = _.allKeys(obj);
-    } else {
-      iteratee = keyInObj;
-      keys = flatten(keys, false, false);
-      obj = Object(obj);
-    }
-    for (var i = 0, length = keys.length; i < length; i++) {
-      var key = keys[i];
-      var value = obj[key];
-      if (iteratee(value, key, obj)) result[key] = value;
-    }
-    return result;
-  });
-
-  // Return a copy of the object without the blacklisted properties.
-  _.omit = restArguments(function(obj, keys) {
-    var iteratee = keys[0], context;
-    if (_.isFunction(iteratee)) {
-      iteratee = _.negate(iteratee);
-      if (keys.length > 1) context = keys[1];
-    } else {
-      keys = _.map(flatten(keys, false, false), String);
-      iteratee = function(value, key) {
-        return !_.contains(keys, key);
-      };
-    }
-    return _.pick(obj, iteratee, context);
-  });
-
-  // Fill in a given object with default properties.
-  _.defaults = createAssigner(_.allKeys, true);
-
-  // Creates an object that inherits from the given prototype object.
-  // If additional properties are provided then they will be added to the
-  // created object.
-  _.create = function(prototype, props) {
-    var result = baseCreate(prototype);
-    if (props) _.extendOwn(result, props);
-    return result;
-  };
-
-  // Create a (shallow-cloned) duplicate of an object.
-  _.clone = function(obj) {
-    if (!_.isObject(obj)) return obj;
-    return _.isArray(obj) ? obj.slice() : _.extend({}, obj);
-  };
-
-  // Invokes interceptor with the obj, and then returns obj.
-  // The primary purpose of this method is to "tap into" a method chain, in
-  // order to perform operations on intermediate results within the chain.
-  _.tap = function(obj, interceptor) {
-    interceptor(obj);
-    return obj;
-  };
-
-  // Returns whether an object has a given set of `key:value` pairs.
-  _.isMatch = function(object, attrs) {
-    var keys = _.keys(attrs), length = keys.length;
-    if (object == null) return !length;
-    var obj = Object(object);
-    for (var i = 0; i < length; i++) {
-      var key = keys[i];
-      if (attrs[key] !== obj[key] || !(key in obj)) return false;
-    }
-    return true;
-  };
-
-
-  // Internal recursive comparison function for `isEqual`.
-  var eq, deepEq;
-  eq = function(a, b, aStack, bStack) {
-    // Identical objects are equal. `0 === -0`, but they aren't identical.
-    // See the [Harmony `egal` proposal](http://wiki.ecmascript.org/doku.php?id=harmony:egal).
-    if (a === b) return a !== 0 || 1 / a === 1 / b;
-    // `null` or `undefined` only equal to itself (strict comparison).
-    if (a == null || b == null) return false;
-    // `NaN`s are equivalent, but non-reflexive.
-    if (a !== a) return b !== b;
-    // Exhaust primitive checks
-    var type = typeof a;
-    if (type !== 'function' && type !== 'object' && typeof b != 'object') return false;
-    return deepEq(a, b, aStack, bStack);
-  };
-
-  // Internal recursive comparison function for `isEqual`.
-  deepEq = function(a, b, aStack, bStack) {
-    // Unwrap any wrapped objects.
-    if (a instanceof _) a = a._wrapped;
-    if (b instanceof _) b = b._wrapped;
-    // Compare `[[Class]]` names.
-    var className = toString.call(a);
-    if (className !== toString.call(b)) return false;
-    switch (className) {
-      // Strings, numbers, regular expressions, dates, and booleans are compared by value.
-      case '[object RegExp]':
-      // RegExps are coerced to strings for comparison (Note: '' + /a/i === '/a/i')
-      case '[object String]':
-        // Primitives and their corresponding object wrappers are equivalent; thus, `"5"` is
-        // equivalent to `new String("5")`.
-        return '' + a === '' + b;
-      case '[object Number]':
-        // `NaN`s are equivalent, but non-reflexive.
-        // Object(NaN) is equivalent to NaN.
-        if (+a !== +a) return +b !== +b;
-        // An `egal` comparison is performed for other numeric values.
-        return +a === 0 ? 1 / +a === 1 / b : +a === +b;
-      case '[object Date]':
-      case '[object Boolean]':
-        // Coerce dates and booleans to numeric primitive values. Dates are compared by their
-        // millisecond representations. Note that invalid dates with millisecond representations
-        // of `NaN` are not equivalent.
-        return +a === +b;
-      case '[object Symbol]':
-        return SymbolProto.valueOf.call(a) === SymbolProto.valueOf.call(b);
-    }
-
-    var areArrays = className === '[object Array]';
-    if (!areArrays) {
-      if (typeof a != 'object' || typeof b != 'object') return false;
-
-      // Objects with different constructors are not equivalent, but `Object`s or `Array`s
-      // from different frames are.
-      var aCtor = a.constructor, bCtor = b.constructor;
-      if (aCtor !== bCtor && !(_.isFunction(aCtor) && aCtor instanceof aCtor &&
-                               _.isFunction(bCtor) && bCtor instanceof bCtor)
-                          && ('constructor' in a && 'constructor' in b)) {
-        return false;
-      }
-    }
-    // Assume equality for cyclic structures. The algorithm for detecting cyclic
-    // structures is adapted from ES 5.1 section 15.12.3, abstract operation `JO`.
-
-    // Initializing stack of traversed objects.
-    // It's done here since we only need them for objects and arrays comparison.
-    aStack = aStack || [];
-    bStack = bStack || [];
-    var length = aStack.length;
-    while (length--) {
-      // Linear search. Performance is inversely proportional to the number of
-      // unique nested structures.
-      if (aStack[length] === a) return bStack[length] === b;
-    }
-
-    // Add the first object to the stack of traversed objects.
-    aStack.push(a);
-    bStack.push(b);
-
-    // Recursively compare objects and arrays.
-    if (areArrays) {
-      // Compare array lengths to determine if a deep comparison is necessary.
-      length = a.length;
-      if (length !== b.length) return false;
-      // Deep compare the contents, ignoring non-numeric properties.
-      while (length--) {
-        if (!eq(a[length], b[length], aStack, bStack)) return false;
-      }
-    } else {
-      // Deep compare objects.
-      var keys = _.keys(a), key;
-      length = keys.length;
-      // Ensure that both objects contain the same number of properties before comparing deep equality.
-      if (_.keys(b).length !== length) return false;
-      while (length--) {
-        // Deep compare each member
-        key = keys[length];
-        if (!(has(b, key) && eq(a[key], b[key], aStack, bStack))) return false;
-      }
-    }
-    // Remove the first object from the stack of traversed objects.
-    aStack.pop();
-    bStack.pop();
-    return true;
-  };
-
-  // Perform a deep comparison to check if two objects are equal.
-  _.isEqual = function(a, b) {
-    return eq(a, b);
-  };
-
-  // Is a given array, string, or object empty?
-  // An "empty" object has no enumerable own-properties.
-  _.isEmpty = function(obj) {
-    if (obj == null) return true;
-    if (isArrayLike(obj) && (_.isArray(obj) || _.isString(obj) || _.isArguments(obj))) return obj.length === 0;
-    return _.keys(obj).length === 0;
-  };
-
-  // Is a given value a DOM element?
-  _.isElement = function(obj) {
-    return !!(obj && obj.nodeType === 1);
-  };
-
-  // Is a given value an array?
-  // Delegates to ECMA5's native Array.isArray
-  _.isArray = nativeIsArray || function(obj) {
-    return toString.call(obj) === '[object Array]';
-  };
-
-  // Is a given variable an object?
-  _.isObject = function(obj) {
-    var type = typeof obj;
-    return type === 'function' || type === 'object' && !!obj;
-  };
-
-  // Add some isType methods: isArguments, isFunction, isString, isNumber, isDate, isRegExp, isError, isMap, isWeakMap, isSet, isWeakSet.
-  _.each(['Arguments', 'Function', 'String', 'Number', 'Date', 'RegExp', 'Error', 'Symbol', 'Map', 'WeakMap', 'Set', 'WeakSet'], function(name) {
-    _['is' + name] = function(obj) {
-      return toString.call(obj) === '[object ' + name + ']';
-    };
-  });
-
-  // Define a fallback version of the method in browsers (ahem, IE < 9), where
-  // there isn't any inspectable "Arguments" type.
-  if (!_.isArguments(arguments)) {
-    _.isArguments = function(obj) {
-      return has(obj, 'callee');
-    };
-  }
-
-  // Optimize `isFunction` if appropriate. Work around some typeof bugs in old v8,
-  // IE 11 (#1621), Safari 8 (#1929), and PhantomJS (#2236).
-  var nodelist = root.document && root.document.childNodes;
-  if ( true && typeof Int8Array != 'object' && typeof nodelist != 'function') {
-    _.isFunction = function(obj) {
-      return typeof obj == 'function' || false;
-    };
-  }
-
-  // Is a given object a finite number?
-  _.isFinite = function(obj) {
-    return !_.isSymbol(obj) && isFinite(obj) && !isNaN(parseFloat(obj));
-  };
-
-  // Is the given value `NaN`?
-  _.isNaN = function(obj) {
-    return _.isNumber(obj) && isNaN(obj);
-  };
-
-  // Is a given value a boolean?
-  _.isBoolean = function(obj) {
-    return obj === true || obj === false || toString.call(obj) === '[object Boolean]';
-  };
-
-  // Is a given value equal to null?
-  _.isNull = function(obj) {
-    return obj === null;
-  };
-
-  // Is a given variable undefined?
-  _.isUndefined = function(obj) {
-    return obj === void 0;
-  };
-
-  // Shortcut function for checking if an object has a given property directly
-  // on itself (in other words, not on a prototype).
-  _.has = function(obj, path) {
-    if (!_.isArray(path)) {
-      return has(obj, path);
-    }
-    var length = path.length;
-    for (var i = 0; i < length; i++) {
-      var key = path[i];
-      if (obj == null || !hasOwnProperty.call(obj, key)) {
-        return false;
-      }
-      obj = obj[key];
-    }
-    return !!length;
-  };
-
-  // Utility Functions
-  // -----------------
-
-  // Run Underscore.js in *noConflict* mode, returning the `_` variable to its
-  // previous owner. Returns a reference to the Underscore object.
-  _.noConflict = function() {
-    root._ = previousUnderscore;
-    return this;
-  };
-
-  // Keep the identity function around for default iteratees.
-  _.identity = function(value) {
-    return value;
-  };
-
-  // Predicate-generating functions. Often useful outside of Underscore.
-  _.constant = function(value) {
-    return function() {
-      return value;
-    };
-  };
-
-  _.noop = function(){};
-
-  // Creates a function that, when passed an object, will traverse that object’s
-  // properties down the given `path`, specified as an array of keys or indexes.
-  _.property = function(path) {
-    if (!_.isArray(path)) {
-      return shallowProperty(path);
-    }
-    return function(obj) {
-      return deepGet(obj, path);
-    };
-  };
-
-  // Generates a function for a given object that returns a given property.
-  _.propertyOf = function(obj) {
-    if (obj == null) {
-      return function(){};
-    }
-    return function(path) {
-      return !_.isArray(path) ? obj[path] : deepGet(obj, path);
-    };
-  };
-
-  // Returns a predicate for checking whether an object has a given set of
-  // `key:value` pairs.
-  _.matcher = _.matches = function(attrs) {
-    attrs = _.extendOwn({}, attrs);
-    return function(obj) {
-      return _.isMatch(obj, attrs);
-    };
-  };
-
-  // Run a function **n** times.
-  _.times = function(n, iteratee, context) {
-    var accum = Array(Math.max(0, n));
-    iteratee = optimizeCb(iteratee, context, 1);
-    for (var i = 0; i < n; i++) accum[i] = iteratee(i);
-    return accum;
-  };
-
-  // Return a random integer between min and max (inclusive).
-  _.random = function(min, max) {
-    if (max == null) {
-      max = min;
-      min = 0;
-    }
-    return min + Math.floor(Math.random() * (max - min + 1));
-  };
-
-  // A (possibly faster) way to get the current timestamp as an integer.
-  _.now = Date.now || function() {
-    return new Date().getTime();
-  };
-
-  // List of HTML entities for escaping.
-  var escapeMap = {
-    '&': '&amp;',
-    '<': '&lt;',
-    '>': '&gt;',
-    '"': '&quot;',
-    "'": '&#x27;',
-    '`': '&#x60;'
-  };
-  var unescapeMap = _.invert(escapeMap);
-
-  // Functions for escaping and unescaping strings to/from HTML interpolation.
-  var createEscaper = function(map) {
-    var escaper = function(match) {
-      return map[match];
-    };
-    // Regexes for identifying a key that needs to be escaped.
-    var source = '(?:' + _.keys(map).join('|') + ')';
-    var testRegexp = RegExp(source);
-    var replaceRegexp = RegExp(source, 'g');
-    return function(string) {
-      string = string == null ? '' : '' + string;
-      return testRegexp.test(string) ? string.replace(replaceRegexp, escaper) : string;
-    };
-  };
-  _.escape = createEscaper(escapeMap);
-  _.unescape = createEscaper(unescapeMap);
-
-  // Traverses the children of `obj` along `path`. If a child is a function, it
-  // is invoked with its parent as context. Returns the value of the final
-  // child, or `fallback` if any child is undefined.
-  _.result = function(obj, path, fallback) {
-    if (!_.isArray(path)) path = [path];
-    var length = path.length;
-    if (!length) {
-      return _.isFunction(fallback) ? fallback.call(obj) : fallback;
-    }
-    for (var i = 0; i < length; i++) {
-      var prop = obj == null ? void 0 : obj[path[i]];
-      if (prop === void 0) {
-        prop = fallback;
-        i = length; // Ensure we don't continue iterating.
-      }
-      obj = _.isFunction(prop) ? prop.call(obj) : prop;
-    }
-    return obj;
-  };
-
-  // Generate a unique integer id (unique within the entire client session).
-  // Useful for temporary DOM ids.
-  var idCounter = 0;
-  _.uniqueId = function(prefix) {
-    var id = ++idCounter + '';
-    return prefix ? prefix + id : id;
-  };
-
-  // By default, Underscore uses ERB-style template delimiters, change the
-  // following template settings to use alternative delimiters.
-  _.templateSettings = {
-    evaluate: /<%([\s\S]+?)%>/g,
-    interpolate: /<%=([\s\S]+?)%>/g,
-    escape: /<%-([\s\S]+?)%>/g
-  };
-
-  // When customizing `templateSettings`, if you don't want to define an
-  // interpolation, evaluation or escaping regex, we need one that is
-  // guaranteed not to match.
-  var noMatch = /(.)^/;
-
-  // Certain characters need to be escaped so that they can be put into a
-  // string literal.
-  var escapes = {
-    "'": "'",
-    '\\': '\\',
-    '\r': 'r',
-    '\n': 'n',
-    '\u2028': 'u2028',
-    '\u2029': 'u2029'
-  };
-
-  var escapeRegExp = /\\|'|\r|\n|\u2028|\u2029/g;
-
-  var escapeChar = function(match) {
-    return '\\' + escapes[match];
-  };
-
-  // JavaScript micro-templating, similar to John Resig's implementation.
-  // Underscore templating handles arbitrary delimiters, preserves whitespace,
-  // and correctly escapes quotes within interpolated code.
-  // NB: `oldSettings` only exists for backwards compatibility.
-  _.template = function(text, settings, oldSettings) {
-    if (!settings && oldSettings) settings = oldSettings;
-    settings = _.defaults({}, settings, _.templateSettings);
-
-    // Combine delimiters into one regular expression via alternation.
-    var matcher = RegExp([
-      (settings.escape || noMatch).source,
-      (settings.interpolate || noMatch).source,
-      (settings.evaluate || noMatch).source
-    ].join('|') + '|$', 'g');
-
-    // Compile the template source, escaping string literals appropriately.
-    var index = 0;
-    var source = "__p+='";
-    text.replace(matcher, function(match, escape, interpolate, evaluate, offset) {
-      source += text.slice(index, offset).replace(escapeRegExp, escapeChar);
-      index = offset + match.length;
-
-      if (escape) {
-        source += "'+\n((__t=(" + escape + "))==null?'':_.escape(__t))+\n'";
-      } else if (interpolate) {
-        source += "'+\n((__t=(" + interpolate + "))==null?'':__t)+\n'";
-      } else if (evaluate) {
-        source += "';\n" + evaluate + "\n__p+='";
-      }
-
-      // Adobe VMs need the match returned to produce the correct offset.
-      return match;
-    });
-    source += "';\n";
-
-    // If a variable is not specified, place data values in local scope.
-    if (!settings.variable) source = 'with(obj||{}){\n' + source + '}\n';
-
-    source = "var __t,__p='',__j=Array.prototype.join," +
-      "print=function(){__p+=__j.call(arguments,'');};\n" +
-      source + 'return __p;\n';
-
-    var render;
-    try {
-      render = new Function(settings.variable || 'obj', '_', source);
-    } catch (e) {
-      e.source = source;
-      throw e;
-    }
-
-    var template = function(data) {
-      return render.call(this, data, _);
-    };
-
-    // Provide the compiled source as a convenience for precompilation.
-    var argument = settings.variable || 'obj';
-    template.source = 'function(' + argument + '){\n' + source + '}';
-
-    return template;
-  };
-
-  // Add a "chain" function. Start chaining a wrapped Underscore object.
-  _.chain = function(obj) {
-    var instance = _(obj);
-    instance._chain = true;
-    return instance;
-  };
-
-  // OOP
-  // ---------------
-  // If Underscore is called as a function, it returns a wrapped object that
-  // can be used OO-style. This wrapper holds altered versions of all the
-  // underscore functions. Wrapped objects may be chained.
-
-  // Helper function to continue chaining intermediate results.
-  var chainResult = function(instance, obj) {
-    return instance._chain ? _(obj).chain() : obj;
-  };
-
-  // Add your own custom functions to the Underscore object.
-  _.mixin = function(obj) {
-    _.each(_.functions(obj), function(name) {
-      var func = _[name] = obj[name];
-      _.prototype[name] = function() {
-        var args = [this._wrapped];
-        push.apply(args, arguments);
-        return chainResult(this, func.apply(_, args));
-      };
-    });
-    return _;
-  };
-
-  // Add all of the Underscore functions to the wrapper object.
-  _.mixin(_);
-
-  // Add all mutator Array functions to the wrapper.
-  _.each(['pop', 'push', 'reverse', 'shift', 'sort', 'splice', 'unshift'], function(name) {
-    var method = ArrayProto[name];
-    _.prototype[name] = function() {
-      var obj = this._wrapped;
-      method.apply(obj, arguments);
-      if ((name === 'shift' || name === 'splice') && obj.length === 0) delete obj[0];
-      return chainResult(this, obj);
-    };
-  });
-
-  // Add all accessor Array functions to the wrapper.
-  _.each(['concat', 'join', 'slice'], function(name) {
-    var method = ArrayProto[name];
-    _.prototype[name] = function() {
-      return chainResult(this, method.apply(this._wrapped, arguments));
-    };
-  });
-
-  // Extracts the result from a wrapped and chained object.
-  _.prototype.value = function() {
-    return this._wrapped;
-  };
-
-  // Provide unwrapping proxy for some methods used in engine operations
-  // such as arithmetic and JSON stringification.
-  _.prototype.valueOf = _.prototype.toJSON = _.prototype.value;
-
-  _.prototype.toString = function() {
-    return String(this._wrapped);
-  };
-
-  // AMD registration happens at the end for compatibility with AMD loaders
-  // that may not enforce next-turn semantics on modules. Even though general
-  // practice for AMD registration is to be anonymous, underscore registers
-  // as a named module because, like jQuery, it is a base library that is
-  // popular enough to be bundled in a third party lib, but not be part of
-  // an AMD load request. Those cases could generate an error when an
-  // anonymous define() is called outside of a loader request.
-  if (true) {
-    !(__WEBPACK_AMD_DEFINE_ARRAY__ = [], __WEBPACK_AMD_DEFINE_RESULT__ = (function() {
-      return _;
-    }).apply(exports, __WEBPACK_AMD_DEFINE_ARRAY__),
-				__WEBPACK_AMD_DEFINE_RESULT__ !== undefined && (module.exports = __WEBPACK_AMD_DEFINE_RESULT__));
-  }
-}());
-
-/* WEBPACK VAR INJECTION */}.call(this, __webpack_require__(7), __webpack_require__(8)(module)))
-
-/***/ }),
-/* 1 */
-/***/ (function(module) {
-
-module.exports = JSON.parse("{\"errors\":{\"callbackRequired\":\"A callback is required!\",\"optionsRequired\":\"Options were not passed and are required.\",\"json2csv\":{\"cannotCallOn\":\"Cannot call json2csv on \",\"dataCheckFailure\":\"Data provided was not an array of documents.\",\"notSameSchema\":\"Not all documents have the same schema.\"},\"csv2json\":{\"cannotCallOn\":\"Cannot call csv2json on \",\"dataCheckFailure\":\"CSV is not a string.\"}},\"defaultOptions\":{\"delimiter\":{\"field\":\",\",\"wrap\":\"\\\"\",\"eol\":\"\\n\"},\"excelBOM\":false,\"prependHeader\":true,\"trimHeaderFields\":false,\"trimFieldValues\":false,\"sortHeader\":false,\"parseCsvNumbers\":false,\"keys\":null,\"checkSchemaDifferences\":false,\"expandArrayObjects\":false},\"values\":{\"excelBOM\":\"﻿\"}}");
-
-/***/ }),
-/* 2 */
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-
-let constants = __webpack_require__(1),
-    _ = __webpack_require__(0);
-
-const dateStringRegex = /\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}.\d{3}Z/;
-
-module.exports = {
-    isStringRepresentation,
-    isDateRepresentation,
-    computeSchemaDifferences,
-    deepCopy,
-    convert,
-    isEmptyField,
-    removeEmptyFields,
-    getNCharacters
-};
-
-/**
- * Build the options to be passed to the appropriate function
- * If a user does not provide custom options, then we use our default
- * If options are provided, then we set each valid key that was passed
- * @param opts {Object} options object
- * @return {Object} options object
- */
-function buildOptions(opts) {
-    opts = _.defaults(opts || {}, constants.defaultOptions);
-
-    // Note: _.defaults does a shallow default, we need to deep copy the DELIMITER object
-    opts.delimiter = _.defaults(opts.delimiter, constants.defaultOptions.delimiter);
-
-    // Otherwise, send the options back
-    return opts;
-}
-
-/**
- * When promisified, the callback and options argument ordering is swapped, so
- * this function is intended to determine which argument is which and return
- * them in the correct order
- * @param arg1 {Object|Function} options or callback
- * @param arg2 {Object|Function} options or callback
- */
-function parseArguments(arg1, arg2) {
-    // If this was promisified (callback and opts are swapped) then fix the argument order.
-    if (_.isObject(arg1) && !_.isFunction(arg1)) {
-        return {
-            options: arg1,
-            callback: arg2
-        };
-    }
-    // Regular ordering where the callback is provided before the options object
-    return {
-        options: arg2,
-        callback: arg1
-    };
-}
-
-/**
- * Validates the parameters passed in to json2csv and csv2json
- * @param config {Object} of the form: { data: {Any}, callback: {Function}, dataCheckFn: Function, errorMessages: {Object} }
- */
-function validateParameters(config) {
-    // If a callback wasn't provided, throw an error
-    if (!config.callback) {
-        throw new Error(constants.errors.callbackRequired);
-    }
-
-    // If we don't receive data, report an error
-    if (!config.data) {
-        config.callback(new Error(config.errorMessages.cannotCallOn + config.data + '.'));
-        return false;
-    }
-
-    // The data provided data does not meet the type check requirement
-    if (!config.dataCheckFn(config.data)) {
-        config.callback(new Error(config.errorMessages.dataCheckFailure));
-        return false;
-    }
-
-    // If we didn't hit any known error conditions, then the data is so far determined to be valid
-    // Note: json2csv/csv2json may perform additional validity checks on the data
-    return true;
-}
-
-/**
- * Abstracted function to perform the conversion of json-->csv or csv-->json
- * depending on the converter class that is passed via the params object
- * @param params {Object}
- */
-function convert(params) {
-    let {options, callback} = parseArguments(params.callback, params.options);
-    options = buildOptions(options);
-
-    let converter = new params.converter(options),
-
-        // Validate the parameters before calling the converter's convert function
-        valid = validateParameters({
-            data: params.data,
-            callback,
-            errorMessages: converter.validationMessages,
-            dataCheckFn: converter.validationFn
-        });
-
-    if (valid) converter.convert(params.data, callback);
-}
-
-/**
- * Utility function to deep copy an object, used by the module tests
- * @param obj
- * @returns {any}
- */
-function deepCopy(obj) {
-    return JSON.parse(JSON.stringify(obj));
-}
-
-/**
- * Helper function that determines whether the provided value is a representation
- *   of a string. Given the RFC4180 requirements, that means that the value is
- *   wrapped in value wrap delimiters (usually a quotation mark on each side).
- * @param fieldValue
- * @param options
- * @returns {boolean}
- */
-function isStringRepresentation(fieldValue, options) {
-    const firstChar = fieldValue[0],
-        lastIndex = fieldValue.length - 1,
-        lastChar = fieldValue[lastIndex];
-
-    // If the field starts and ends with a wrap delimiter
-    return firstChar === options.delimiter.wrap && lastChar === options.delimiter.wrap;
-}
-
-/**
- * Helper function that determines whether the provided value is a representation
- *   of a date.
- * @param fieldValue
- * @returns {boolean}
- */
-function isDateRepresentation(fieldValue) {
-    return dateStringRegex.test(fieldValue);
-}
-
-/**
- * Helper function that determines the schema differences between two objects.
- * @param schemaA
- * @param schemaB
- * @returns {*}
- */
-function computeSchemaDifferences(schemaA, schemaB) {
-    return _.difference(schemaA, schemaB)
-        .concat(_.difference(schemaB, schemaA));
-}
-
-/**
- * Utility function to check if a field is considered empty so that the emptyFieldValue can be used instead
- * @param fieldValue
- * @returns {boolean}
- */
-function isEmptyField(fieldValue) {
-    return _.isUndefined(fieldValue) || _.isNull(fieldValue) || fieldValue === '';
-}
-
-/**
- * Helper function that removes empty field values from an array.
- * @param fields
- * @returns {Array}
- */
-function removeEmptyFields(fields) {
-    return _.filter(fields, (field) => !isEmptyField(field));
-}
-
-/**
- * Helper function that retrieves the next n characters from the start index in
- *   the string including the character at the start index. This is used to
- *   check if are currently at an EOL value, since it could be multiple
- *   characters in length (eg. '\r\n')
- * @param str
- * @param start
- * @param n
- * @returns {string}
- */
-function getNCharacters(str, start, n) {
-    return str.substring(start, start + n);
-}
-
-
-/***/ }),
-/* 3 */
 /***/ (function(module, exports, __webpack_require__) {
 
 var __WEBPACK_AMD_DEFINE_FACTORY__, __WEBPACK_AMD_DEFINE_ARRAY__, __WEBPACK_AMD_DEFINE_RESULT__;//download.js v4.2, by dandavis; 2008-2016. [MIT] see http://danml.com/download.html for tests/usage
@@ -2150,7 +253,7 @@ var __WEBPACK_AMD_DEFINE_FACTORY__, __WEBPACK_AMD_DEFINE_ARRAY__, __WEBPACK_AMD_
 
 
 /***/ }),
-/* 4 */
+/* 1 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -2231,15 +334,312 @@ function computeStateInformation(keyPath) {
 
 
 /***/ }),
-/* 5 */
+/* 2 */
+/***/ (function(module) {
+
+module.exports = JSON.parse("{\"errors\":{\"callbackRequired\":\"A callback is required!\",\"optionsRequired\":\"Options were not passed and are required.\",\"json2csv\":{\"cannotCallOn\":\"Cannot call json2csv on \",\"dataCheckFailure\":\"Data provided was not an array of documents.\",\"notSameSchema\":\"Not all documents have the same schema.\"},\"csv2json\":{\"cannotCallOn\":\"Cannot call csv2json on \",\"dataCheckFailure\":\"CSV is not a string.\"}},\"defaultOptions\":{\"delimiter\":{\"field\":\",\",\"wrap\":\"\\\"\",\"eol\":\"\\n\"},\"excelBOM\":false,\"prependHeader\":true,\"trimHeaderFields\":false,\"trimFieldValues\":false,\"sortHeader\":false,\"parseCsvNumbers\":false,\"keys\":null,\"checkSchemaDifferences\":false,\"expandArrayObjects\":false,\"unwindArrays\":false},\"values\":{\"excelBOM\":\"﻿\"}}");
+
+/***/ }),
+/* 3 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
 
 
-let {Json2Csv} = __webpack_require__(6), // Require our json-2-csv code
-    {Csv2Json} = __webpack_require__(10), // Require our csv-2-json code
-    utils = __webpack_require__(2);
+let path = __webpack_require__(1),
+    constants = __webpack_require__(2);
+
+const dateStringRegex = /\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}.\d{3}Z/;
+
+module.exports = {
+    isStringRepresentation,
+    isDateRepresentation,
+    computeSchemaDifferences,
+    deepCopy,
+    convert,
+    isEmptyField,
+    removeEmptyFields,
+    getNCharacters,
+    unwind,
+
+    // underscore replacements:
+    isString,
+    isNull,
+    isError,
+    isDate,
+    isUndefined,
+    isObject,
+    unique,
+    flatten
+};
+
+/**
+ * Build the options to be passed to the appropriate function
+ * If a user does not provide custom options, then we use our default
+ * If options are provided, then we set each valid key that was passed
+ * @param opts {Object} options object
+ * @return {Object} options object
+ */
+function buildOptions(opts) {
+    opts = {...constants.defaultOptions, ...opts || {}};
+
+    // Note: Object.assign does a shallow default, we need to deep copy the delimiter object
+    opts.delimiter = {...constants.defaultOptions.delimiter, ...opts.delimiter};
+
+    // Otherwise, send the options back
+    return opts;
+}
+
+/**
+ * When promisified, the callback and options argument ordering is swapped, so
+ * this function is intended to determine which argument is which and return
+ * them in the correct order
+ * @param arg1 {Object|Function} options or callback
+ * @param arg2 {Object|Function} options or callback
+ */
+function parseArguments(arg1, arg2) {
+    // If this was promisified (callback and opts are swapped) then fix the argument order.
+    if (isObject(arg1) && !isFunction(arg1)) {
+        return {
+            options: arg1,
+            callback: arg2
+        };
+    }
+    // Regular ordering where the callback is provided before the options object
+    return {
+        options: arg2,
+        callback: arg1
+    };
+}
+
+/**
+ * Validates the parameters passed in to json2csv and csv2json
+ * @param config {Object} of the form: { data: {Any}, callback: {Function}, dataCheckFn: Function, errorMessages: {Object} }
+ */
+function validateParameters(config) {
+    // If a callback wasn't provided, throw an error
+    if (!config.callback) {
+        throw new Error(constants.errors.callbackRequired);
+    }
+
+    // If we don't receive data, report an error
+    if (!config.data) {
+        config.callback(new Error(config.errorMessages.cannotCallOn + config.data + '.'));
+        return false;
+    }
+
+    // The data provided data does not meet the type check requirement
+    if (!config.dataCheckFn(config.data)) {
+        config.callback(new Error(config.errorMessages.dataCheckFailure));
+        return false;
+    }
+
+    // If we didn't hit any known error conditions, then the data is so far determined to be valid
+    // Note: json2csv/csv2json may perform additional validity checks on the data
+    return true;
+}
+
+/**
+ * Abstracted function to perform the conversion of json-->csv or csv-->json
+ * depending on the converter class that is passed via the params object
+ * @param params {Object}
+ */
+function convert(params) {
+    let {options, callback} = parseArguments(params.callback, params.options);
+    options = buildOptions(options);
+
+    let converter = new params.converter(options),
+
+        // Validate the parameters before calling the converter's convert function
+        valid = validateParameters({
+            data: params.data,
+            callback,
+            errorMessages: converter.validationMessages,
+            dataCheckFn: converter.validationFn
+        });
+
+    if (valid) converter.convert(params.data, callback);
+}
+
+/**
+ * Utility function to deep copy an object, used by the module tests
+ * @param obj
+ * @returns {any}
+ */
+function deepCopy(obj) {
+    return JSON.parse(JSON.stringify(obj));
+}
+
+/**
+ * Helper function that determines whether the provided value is a representation
+ *   of a string. Given the RFC4180 requirements, that means that the value is
+ *   wrapped in value wrap delimiters (usually a quotation mark on each side).
+ * @param fieldValue
+ * @param options
+ * @returns {boolean}
+ */
+function isStringRepresentation(fieldValue, options) {
+    const firstChar = fieldValue[0],
+        lastIndex = fieldValue.length - 1,
+        lastChar = fieldValue[lastIndex];
+
+    // If the field starts and ends with a wrap delimiter
+    return firstChar === options.delimiter.wrap && lastChar === options.delimiter.wrap;
+}
+
+/**
+ * Helper function that determines whether the provided value is a representation
+ *   of a date.
+ * @param fieldValue
+ * @returns {boolean}
+ */
+function isDateRepresentation(fieldValue) {
+    return dateStringRegex.test(fieldValue);
+}
+
+/**
+ * Helper function that determines the schema differences between two objects.
+ * @param schemaA
+ * @param schemaB
+ * @returns {*}
+ */
+function computeSchemaDifferences(schemaA, schemaB) {
+    return arrayDifference(schemaA, schemaB)
+        .concat(arrayDifference(schemaB, schemaA));
+}
+
+/**
+ * Utility function to check if a field is considered empty so that the emptyFieldValue can be used instead
+ * @param fieldValue
+ * @returns {boolean}
+ */
+function isEmptyField(fieldValue) {
+    return isUndefined(fieldValue) || isNull(fieldValue) || fieldValue === '';
+}
+
+/**
+ * Helper function that removes empty field values from an array.
+ * @param fields
+ * @returns {Array}
+ */
+function removeEmptyFields(fields) {
+    return fields.filter((field) => !isEmptyField(field));
+}
+
+/**
+ * Helper function that retrieves the next n characters from the start index in
+ *   the string including the character at the start index. This is used to
+ *   check if are currently at an EOL value, since it could be multiple
+ *   characters in length (eg. '\r\n')
+ * @param str
+ * @param start
+ * @param n
+ * @returns {string}
+ */
+function getNCharacters(str, start, n) {
+    return str.substring(start, start + n);
+}
+
+/**
+ * The following unwind functionality is a heavily modified version of @edwincen's
+ * unwind extension for lodash. Since lodash is a large package to require in,
+ * and all of the required functionality was already being imported, either
+ * natively or with doc-path, I decided to rewrite the majority of the logic
+ * so that an additional dependency would not be required. The original code
+ * with the lodash dependency can be found here:
+ *
+ * https://github.com/edwincen/unwind/blob/master/index.js
+ */
+
+/**
+ * Core function that unwinds an item at the provided path
+ * @param accumulator {Array<any>}
+ * @param item {any}
+ * @param fieldPath {String}
+ */
+function unwindItem(accumulator, item, fieldPath) {
+    const valueToUnwind = path.evaluatePath(item, fieldPath);
+    let cloned = deepCopy(item);
+
+    if (Array.isArray(valueToUnwind)) {
+        valueToUnwind.forEach((val) => {
+            cloned = deepCopy(item);
+            accumulator.push(path.setPath(cloned, fieldPath, val));
+        });
+    } else {
+        accumulator.push(cloned);
+    }
+}
+
+/**
+ * Main unwind function which takes an array and a field to unwind.
+ * @param array {Array<any>}
+ * @param field {String}
+ * @returns {Array<any>}
+ */
+function unwind(array, field) {
+    const result = [];
+    array.forEach((item) => {
+        unwindItem(result, item, field);
+    });
+    return result;
+}
+
+/*
+ * Helper functions which were created to remove underscorejs from this package.
+ */
+
+function isString(value) {
+    return typeof value === 'string';
+}
+
+function isObject(value) {
+    return typeof value === 'object';
+}
+
+function isFunction(value) {
+    return typeof value === 'function';
+}
+
+function isNull(value) {
+    return value === null;
+}
+
+function isDate(value) {
+    return value instanceof Date;
+}
+
+function isUndefined(value) {
+    return typeof value === 'undefined';
+}
+
+function isError(value) {
+    return Object.prototype.toString.call(value) === '[object Error]';
+}
+
+function arrayDifference(a, b) {
+    return a.filter((x) => !b.includes(x));
+}
+
+function unique(array) {
+    return [...new Set(array)];
+}
+
+function flatten(array) {
+    return [].concat(...array);
+}
+
+
+/***/ }),
+/* 4 */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+let {Json2Csv} = __webpack_require__(5), // Require our json-2-csv code
+    {Csv2Json} = __webpack_require__(8), // Require our csv-2-json code
+    utils = __webpack_require__(3);
 
 module.exports = {
     json2csv: (data, callback, options) => convert(Json2Csv, data, callback, options),
@@ -2308,24 +708,24 @@ function deprecatedAsync(converter, deprecatedName, replacementName, data, optio
 
 
 /***/ }),
-/* 6 */
+/* 5 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
 
 
-let constants = __webpack_require__(1),
-    utils = __webpack_require__(2),
-    _ = __webpack_require__(0),
-    path = __webpack_require__(4),
-    deeks = __webpack_require__(9);
+let path = __webpack_require__(1),
+    deeks = __webpack_require__(6),
+    constants = __webpack_require__(2),
+    utils = __webpack_require__(3);
 
 const Json2Csv = function(options) {
     const wrapDelimiterCheckRegex = new RegExp(options.delimiter.wrap, 'g'),
         crlfSearchRegex = /\r?\n|\r/,
+        expandingWithoutUnwinding = options.expandArrayObjects && !options.unwindArrays,
         deeksOptions = {
-            expandArrayObjects: options.expandArrayObjects,
-            ignoreEmptyArraysWhenExpanding: options.expandArrayObjects
+            expandArrayObjects: expandingWithoutUnwinding,
+            ignoreEmptyArraysWhenExpanding: expandingWithoutUnwinding
         };
 
     /** HEADER FIELD FUNCTIONS **/
@@ -2353,7 +753,7 @@ const Json2Csv = function(options) {
             return checkSchemaDifferences(documentSchemas);
         } else {
             // Otherwise, we do not care if the schemas are different, so we should get the unique list of keys
-            let uniqueFieldNames = _.uniq(_.flatten(documentSchemas));
+            let uniqueFieldNames = utils.unique(utils.flatten(documentSchemas));
             return Promise.resolve(uniqueFieldNames);
         }
     }
@@ -2454,7 +854,7 @@ const Json2Csv = function(options) {
      * @returns {Promise}
      */
     function retrieveHeaderFields(data) {
-        if (options.keys) {
+        if (options.keys && !options.unwindArrays) {
             return Promise.resolve(options.keys)
                 .then(sortHeaderFields);
         }
@@ -2465,6 +865,42 @@ const Json2Csv = function(options) {
     }
 
     /** RECORD FIELD FUNCTIONS **/
+
+    /**
+     * Unwinds objects in arrays within record objects if the user specifies the
+     *   expandArrayObjects option. If not specified, this passes the params
+     *   argument through to the next function in the promise chain.
+     * @param params {Object}
+     * @returns {Promise}
+     */
+    function unwindRecordsIfNecessary(params) {
+        if (options.unwindArrays) {
+            const originalRecordsLength = params.records.length;
+
+            // Unwind each of the documents at the given headerField
+            params.headerFields.forEach((headerField) => {
+                params.records = utils.unwind(params.records, headerField);
+            });
+
+            return retrieveHeaderFields(params.records)
+                .then((headerFields) => {
+                    params.headerFields = headerFields;
+
+                    // If we were able to unwind more arrays, then try unwinding again...
+                    if (originalRecordsLength !== params.records.length) {
+                        return unwindRecordsIfNecessary(params);
+                    }
+                    // Otherwise, we didn't unwind any additional arrays, so continue...
+
+                    // If keys were provided, set the headerFields to the provided keys:
+                    if (options.keys) {
+                        params.headerFields = options.keys;
+                    }
+                    return params;
+                });
+        }
+        return params;
+    }
 
     /**
      * Main function which handles the processing of a record, or document to be converted to CSV format
@@ -2532,7 +968,7 @@ const Json2Csv = function(options) {
         fields.forEach((field) => {
             let recordFieldValue = path.evaluatePath(record, field);
 
-            if (!_.isUndefined(options.emptyFieldValue) && utils.isEmptyField(recordFieldValue)) {
+            if (!utils.isUndefined(options.emptyFieldValue) && utils.isEmptyField(recordFieldValue)) {
                 recordFieldValue = options.emptyFieldValue;
             } else if (options.expandArrayObjects && Array.isArray(recordFieldValue)) {
                 recordFieldValue = processRecordFieldDataForExpandedArrayObject(recordFieldValue);
@@ -2550,11 +986,11 @@ const Json2Csv = function(options) {
      * @returns {*}
      */
     function recordFieldValueToString(fieldValue) {
-        if (_.isArray(fieldValue) || _.isObject(fieldValue) && !_.isDate(fieldValue)) {
+        if (Array.isArray(fieldValue) || utils.isObject(fieldValue) && !utils.isDate(fieldValue)) {
             return JSON.stringify(fieldValue);
-        } else if (_.isUndefined(fieldValue)) {
+        } else if (utils.isUndefined(fieldValue)) {
             return 'undefined';
-        } else if (_.isNull(fieldValue)) {
+        } else if (utils.isNull(fieldValue)) {
             return 'null';
         } else {
             return fieldValue.toString();
@@ -2568,9 +1004,9 @@ const Json2Csv = function(options) {
      */
     function trimRecordFieldValue(fieldValue) {
         if (options.trimFieldValues) {
-            if (_.isArray(fieldValue)) {
+            if (Array.isArray(fieldValue)) {
                 return fieldValue.map(trimRecordFieldValue);
-            } else if (_.isString(fieldValue)) {
+            } else if (utils.isString(fieldValue)) {
                 return fieldValue.trim();
             }
             return fieldValue;
@@ -2642,7 +1078,7 @@ const Json2Csv = function(options) {
      */
     function convert(data, callback) {
         // Single document, not an array
-        if (_.isObject(data) && !data.length) {
+        if (utils.isObject(data) && !data.length) {
             data = [data]; // Convert to an array of the given document
         }
 
@@ -2653,6 +1089,7 @@ const Json2Csv = function(options) {
                 callback,
                 records: data
             }))
+            .then(unwindRecordsIfNecessary)
             .then(processRecords)
             .then(wrapHeaderFields)
             .then(trimHeaderFields)
@@ -2663,7 +1100,7 @@ const Json2Csv = function(options) {
 
     return {
         convert,
-        validationFn: _.isObject,
+        validationFn: utils.isObject,
         validationMessages: constants.errors.json2csv
     };
 };
@@ -2672,67 +1109,13 @@ module.exports = { Json2Csv };
 
 
 /***/ }),
-/* 7 */
-/***/ (function(module, exports) {
-
-var g;
-
-// This works in non-strict mode
-g = (function() {
-	return this;
-})();
-
-try {
-	// This works if eval is allowed (see CSP)
-	g = g || new Function("return this")();
-} catch (e) {
-	// This works if the window reference is available
-	if (typeof window === "object") g = window;
-}
-
-// g can still be undefined, but nothing to do about it...
-// We return undefined, instead of nothing here, so it's
-// easier to handle this case. if(!global) { ...}
-
-module.exports = g;
-
-
-/***/ }),
-/* 8 */
-/***/ (function(module, exports) {
-
-module.exports = function(module) {
-	if (!module.webpackPolyfill) {
-		module.deprecate = function() {};
-		module.paths = [];
-		// module.parent = undefined by default
-		if (!module.children) module.children = [];
-		Object.defineProperty(module, "loaded", {
-			enumerable: true,
-			get: function() {
-				return module.l;
-			}
-		});
-		Object.defineProperty(module, "id", {
-			enumerable: true,
-			get: function() {
-				return module.i;
-			}
-		});
-		module.webpackPolyfill = 1;
-	}
-	return module;
-};
-
-
-/***/ }),
-/* 9 */
+/* 6 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
 
 
-const _ = __webpack_require__(0);
+const utils = __webpack_require__(7);
 
 module.exports = {
     deepKeys: deepKeys,
@@ -2747,7 +1130,7 @@ module.exports = {
  */
 function deepKeys(object, options) {
     options = mergeOptions(options);
-    if (_.isObject(object)) {
+    if (utils.isObject(object)) {
         return generateDeepKeysList('', object, options);
     }
     return [];
@@ -2762,7 +1145,7 @@ function deepKeys(object, options) {
 function deepKeysFromList(list, options) {
     options = mergeOptions(options);
     return list.map((document) => { // for each document
-        if (_.isObject(document)) {
+        if (utils.isObject(document)) {
             // if the data at the key is a document, then we retrieve the subHeading starting with an empty string heading and the doc
             return deepKeys(document, options);
         }
@@ -2786,7 +1169,7 @@ function generateDeepKeysList(heading, data, options) {
         return keyName;
     });
 
-    return _.flatten(keys);
+    return utils.flatten(keys);
 }
 
 /**
@@ -2802,7 +1185,7 @@ function processArrayKeys(subArray, currentKeyPath, options) {
 
     if (!subArray.length) {
         return options.ignoreEmptyArraysWhenExpanding ? [] : [currentKeyPath];
-    } else if (subArray.length && _.flatten(subArrayKeys).length === 0) {
+    } else if (subArray.length && utils.flatten(subArrayKeys).length === 0) {
         // Has items in the array, but no objects
         return [currentKeyPath];
     } else {
@@ -2813,7 +1196,7 @@ function processArrayKeys(subArray, currentKeyPath, options) {
             return schemaKeys.map((subKey) => buildKeyName(currentKeyPath, subKey));
         });
 
-        return _.uniq(_.flatten(subArrayKeys));
+        return utils.unique(utils.flatten(subArrayKeys));
     }
 }
 
@@ -2836,7 +1219,7 @@ function buildKeyName(upperKeyName, currentKeyName) {
  * @returns {boolean}
  */
 function isDocumentToRecurOn(val) {
-    return _.isObject(val) && !_.isNull(val) && !Array.isArray(val) && Object.keys(val).length;
+    return utils.isObject(val) && !utils.isNull(val) && !Array.isArray(val) && Object.keys(val).length;
 }
 
 /**
@@ -2858,24 +1241,85 @@ function isEmptyArray(val) {
 }
 
 function mergeOptions(options) {
-    return _.defaults(options || {}, {
+    return {
         expandArrayObjects: false,
-        ignoreEmptyArraysWhenExpanding: false
-    });
+        ignoreEmptyArraysWhenExpanding: false,
+        ...options || {}
+    };
 }
 
 
 /***/ }),
-/* 10 */
+/* 7 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
 
 
-let constants = __webpack_require__(1),
-    utils = __webpack_require__(2),
-    _ = __webpack_require__(0),
-    path = __webpack_require__(4);
+module.exports = {
+    // underscore replacements:
+    isString,
+    isNull,
+    isError,
+    isDate,
+    isFunction,
+    isUndefined,
+    isObject,
+    unique,
+    flatten
+};
+
+/*
+ * Helper functions which were created to remove underscorejs from this package.
+ */
+
+function isString(value) {
+    return typeof value === 'string';
+}
+
+function isObject(value) {
+    return typeof value === 'object';
+}
+
+function isFunction(value) {
+    return typeof value === 'function';
+}
+
+function isNull(value) {
+    return value === null;
+}
+
+function isDate(value) {
+    return value instanceof Date;
+}
+
+function isUndefined(value) {
+    return typeof value === 'undefined';
+}
+
+function isError(value) {
+    return Object.prototype.toString.call(value) === '[object Error]';
+}
+
+function unique(array) {
+    return [...new Set(array)];
+}
+
+function flatten(array) {
+    return [].concat(...array);
+}
+
+
+/***/ }),
+/* 8 */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+let path = __webpack_require__(1),
+    constants = __webpack_require__(2),
+    utils = __webpack_require__(3);
 
 const Csv2Json = function(options) {
     const escapedWrapDelimiterRegex = new RegExp(options.delimiter.wrap + options.delimiter.wrap, 'g'),
@@ -3115,7 +1559,7 @@ const Csv2Json = function(options) {
         let parsedJson = parseValue(fieldValue);
         // If parsedJson is anything aside from an error, then we want to use the parsed value
         // This allows us to interpret values like 'null' --> null, 'false' --> false
-        if (!_.isError(parsedJson)) {
+        if (!utils.isError(parsedJson)) {
             fieldValue = parsedJson;
         } else if (fieldValue === 'undefined') {
             fieldValue = undefined;
@@ -3130,7 +1574,7 @@ const Csv2Json = function(options) {
      * @returns {String|null}
      */
     function trimRecordValue(fieldValue) {
-        if (options.trimFieldValues && !_.isNull(fieldValue)) {
+        if (options.trimFieldValues && !utils.isNull(fieldValue)) {
             return fieldValue.trim();
         }
         return fieldValue;
@@ -3218,7 +1662,7 @@ const Csv2Json = function(options) {
             let parsedJson = JSON.parse(value);
 
             // If the parsed value is an array, then we also need to trim record values, if specified
-            if (_.isArray(parsedJson)) {
+            if (Array.isArray(parsedJson)) {
                 return parsedJson.map(trimRecordValue);
             }
 
@@ -3249,7 +1693,7 @@ const Csv2Json = function(options) {
 
     return {
         convert,
-        validationFn: _.isString,
+        validationFn: utils.isString,
         validationMessages: constants.errors.csv2json
     };
 };
@@ -3258,11 +1702,17 @@ module.exports = { Csv2Json };
 
 
 /***/ }),
-/* 11 */
+/* 9 */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
+// ESM COMPAT FLAG
 __webpack_require__.r(__webpack_exports__);
+
+// EXPORTS
+__webpack_require__.d(__webpack_exports__, "BrainCanvas", function() { return /* binding */ src_BrainCanvas; });
+
+// NAMESPACE OBJECT: ./src/js/three.module.js
 var three_module_namespaceObject = {};
 __webpack_require__.r(three_module_namespaceObject);
 __webpack_require__.d(three_module_namespaceObject, "ACESFilmicToneMapping", function() { return ACESFilmicToneMapping; });
@@ -57576,7 +56026,152 @@ function debounce(func, wait, immediate) {
 
 
 
+// CONCATENATED MODULE: ./src/js/constants.js
+
+// Defined all the constants
+
+const CONSTANTS = {};
+
+/* ------------------------------------ Layer setups ------------------------------------
+  Defines for each camera which layers are visible.
+  Protocols are
+    Layers:
+      - 0, 2, 3: Especially reserved for main camera
+      - 1, Shared by all cameras
+      - 4, 5, 6: Reserved for side-cameras
+      - 7: reserved for all, system reserved
+      - 8: main camera only, system reserved
+      - 9 side-cameras 1 only, system reserved
+      - 10 side-cameras 2 only, system reserved
+      - 11 side-cameras 3 only, system reserved
+      - 12 side-cameras 4 only, system reserved
+      - 13 all side cameras, system reserved
+      - 14~31 invisible
+
+*/
+
+CONSTANTS.LAYER_USER_MAIN_CAMERA_0 = 0;           // User use, main camera only
+CONSTANTS.LAYER_USER_ALL_CAMERA_1 = 1;            // User use, all cameras visible
+CONSTANTS.LAYER_USER_ALL_SIDE_CAMERAS_4 = 4;      // User use, all side cameras
+CONSTANTS.LAYER_SYS_ALL_CAMERAS_7 = 7;            // System reserved, all cameras
+CONSTANTS.LAYER_SYS_MAIN_CAMERA_8 = 8;            // System reserved, main cameras only
+CONSTANTS.LAYER_SYS_CORONAL_9 = 9;                // System reserved, coronal camera only
+CONSTANTS.LAYER_SYS_AXIAL_10 = 10;                 // System reserved, axial camera only
+CONSTANTS.LAYER_SYS_SAGITTAL_11 = 11;              // System reserved, sagittal camera only
+CONSTANTS.LAYER_SYS_ALL_SIDE_CAMERAS_13 = 13;      // System reserved, all side cameras visible
+
+/* ------------------------------------ Global constants ------------------------------------
+*/
+
+// reorder render depth to force renders to render objects with maximum render order first
+CONSTANTS.MAX_RENDER_ORDER = 9999999;
+CONSTANTS.VEC_ORIGIN = new threeplugins_THREE.Vector3( 0, 0, 0 );
+// Anatomcal axis RAS is the normal XYZ, LAI is the other direction
+CONSTANTS.VEC_ANAT_R = new threeplugins_THREE.Vector3( 1, 0, 0 );
+CONSTANTS.VEC_ANAT_A = new threeplugins_THREE.Vector3( 0, 1, 0 );
+CONSTANTS.VEC_ANAT_S = new threeplugins_THREE.Vector3( 0, 0, 1 );
+CONSTANTS.VEC_ANAT_L = new threeplugins_THREE.Vector3( -1, 0, 0 );
+CONSTANTS.VEC_ANAT_P = new threeplugins_THREE.Vector3( 0, -1, 0 );
+CONSTANTS.VEC_ANAT_I = new threeplugins_THREE.Vector3( 0, 0, -1 );
+
+// You can only change which key is pressed. However, you cannot change shift & ctrl or alt
+// To do that you must go into the code
+CONSTANTS.KEY_ZOOM                    = 'KeyZ';         // z for zoom out and Z for zoom in
+CONSTANTS.KEY_CYCLE_LEFT              = 'BracketLeft';  // [ for cycle through left hemisphere material
+CONSTANTS.KEY_CYCLE_RIGHT             = 'BracketRight'; // ] for cycle through right hemisphere material
+CONSTANTS.KEY_CYCLE_ELECTRODES_NEXT   = 'Period';       // "." for choosing next electrodes
+CONSTANTS.KEY_CYCLE_ELECTRODES_PREV   = 'Comma';        // "," for choosing previous electrodes
+CONSTANTS.KEY_CYCLE_ELEC_VISIBILITY   = 'KeyV';         // 'v' for cycling through visible, hide inactive, hidden
+CONSTANTS.KEY_CYCLE_SURFACE           = 'KeyP';         // "p" for cycle through surfaces
+CONSTANTS.KEY_CYCLE_MATERIAL          = 'KeyM';         // "M" for cycle through material
+CONSTANTS.KEY_OVERLAY_CORONAL         = 'KeyC';         // 'C' for coronal
+CONSTANTS.KEY_OVERLAY_AXIAL           = 'KeyA';         // 'A' for axial
+CONSTANTS.KEY_OVERLAY_SAGITTAL        = 'KeyS';         // 'S' for sagittal
+CONSTANTS.KEY_MOVE_CORONAL            = 'KeyE';         // 'Q' for moving coronal f/b
+CONSTANTS.KEY_MOVE_AXIAL              = 'KeyQ';         // 'W' for moving axial f/b
+CONSTANTS.KEY_MOVE_SAGITTAL           = 'KeyW';         // 'E' for moving sagittal f/b
+CONSTANTS.KEY_CYCLE_ANIMATION         = 'KeyC';         // 'c' for cycling through animation clips
+CONSTANTS.KEY_TOGGLE_ANIMATION        = 'KeyS';         // 's' for play/paus animation
+CONSTANTS.KEY_CYCLE_ELEC_EDITOR       = 'Backquote';    // '`' for cycling through electrodes (localization)
+CONSTANTS.KEY_CYCLE_SURFTYPE_EDITOR   = 'Digit4';       // '4' for toggle electrode type (surface ot iEEG)
+CONSTANTS.KEY_NEW_ELECTRODE_EDITOR    = 'Digit1';       // '1' new electrode
+CONSTANTS.KEY_LABEL_FOCUS_EDITOR      = 'Digit2';       // '2' for quick edit label
+CONSTANTS.KEY_CYCLE_REMOVE_EDITOR     = 'KeyR';
+
+CONSTANTS.TOOLTIPS = {};
+CONSTANTS.TOOLTIPS.KEY_ZOOM                    = 'z/Z';
+CONSTANTS.TOOLTIPS.KEY_CYCLE_LEFT              = '[';
+CONSTANTS.TOOLTIPS.KEY_CYCLE_RIGHT             = ']';
+CONSTANTS.TOOLTIPS.KEY_CYCLE_ELECTRODES_NEXT   = '.';
+CONSTANTS.TOOLTIPS.KEY_CYCLE_ELECTRODES_PREV   = ',';
+CONSTANTS.TOOLTIPS.KEY_CYCLE_ELEC_VISIBILITY   = 'v';
+CONSTANTS.TOOLTIPS.KEY_CYCLE_SURFACE           = 'p';
+CONSTANTS.TOOLTIPS.KEY_CYCLE_MATERIAL          = '⇧M';
+CONSTANTS.TOOLTIPS.KEY_OVERLAY_CORONAL         = '⇧C';
+CONSTANTS.TOOLTIPS.KEY_OVERLAY_AXIAL           = '⇧A';
+CONSTANTS.TOOLTIPS.KEY_OVERLAY_SAGITTAL        = '⇧S';
+CONSTANTS.TOOLTIPS.KEY_MOVE_CORONAL            = 'e/E';
+CONSTANTS.TOOLTIPS.KEY_MOVE_AXIAL              = 'q/Q';
+CONSTANTS.TOOLTIPS.KEY_MOVE_SAGITTAL           = 'w/W';
+CONSTANTS.TOOLTIPS.KEY_CYCLE_ANIMATION         = 'c';
+CONSTANTS.TOOLTIPS.KEY_TOGGLE_ANIMATION        = 's';
+CONSTANTS.TOOLTIPS.KEY_CYCLE_ELEC_EDITOR       = '`';
+CONSTANTS.TOOLTIPS.KEY_CYCLE_SURFTYPE_EDITOR   = '4';
+CONSTANTS.TOOLTIPS.KEY_NEW_ELECTRODE_EDITOR    = '1';
+CONSTANTS.TOOLTIPS.KEY_LABEL_FOCUS_EDITOR      = '2';
+CONSTANTS.TOOLTIPS.KEY_CYCLE_REMOVE_EDITOR     = 'r';
+
+// Regular expressions
+CONSTANTS.REGEXP_SURFACE_GROUP    = /^Surface - (.+) \((.+)\)$/;  // Surface - pial (YAB)
+CONSTANTS.REGEXP_VOLUME_GROUP     = /^Volume - (.+) \((.+)\)$/;   // Volume - brain.finalsurfs (YAB)
+CONSTANTS.REGEXP_ELECTRODE_GROUP  = /^Electrodes \((.+)\)$/;                  // Electrodes (YAB)
+CONSTANTS.REGEXP_SURFACE          = /^([\w ]+) (Left|right) Hemisphere - (.+) \((.+)\)$/;   // Standard 141 Left Hemisphere - pial (YAB)
+CONSTANTS.REGEXP_VOLUME           = /^(.+) \((.+)\)$/;                   // brain.finalsurfs (YAB)
+CONSTANTS.REGEXP_ELECTRODE        = /^(.+), ([0-9]+) - (.*)$/;     // YAB, 1 - pSYLV12
+
+// Colors
+CONSTANTS.COLOR_MAIN_LIGHT = 0xefefef;                  // Color for main camera casting towards objects
+CONSTANTS.COLOR_AMBIENT_LIGHT = 0x808080;               // Color for ambient light that lights up all cameras
+
+
+// dat.GUI folders
+CONSTANTS.FOLDERS = {
+  'background-color'      : 'Default',
+  'sync-viewers'          : 'Default',
+  'video-recorder'        : 'Default',
+  'reset-main-camera'     : 'Default',
+  'main-camera-position'  : 'Default',
+  'toggle-helpper'        : 'Default',
+  'toggle-side-panels'    : 'Volume Settings',
+  'reset-side-panels'     : 'Volume Settings',
+  'side-three-planes'     : 'Volume Settings',
+  'side-electrode-dist'   : 'Volume Settings',
+  'subject-selector'      : 'Surface Settings',
+  'surface-selector'      : 'Surface Settings',
+  'hemisphere-material'   : 'Surface Settings',
+  'electrode-style'       : 'Electrodes',
+  'electrode-mapping'     : 'Electrodes',
+  'animation'             : 'Data Visualization',
+  'highlight-selection'   : 'Data Visualization'
+};
+
+CONSTANTS.THRESHOLD_OPERATORS = [
+  'v = T1',
+  '|v| < T1',
+  '|v| >= T1',
+  'v < T1',
+  'v >= T1',
+  'v in [T1, T2]',
+  'v not in [T1,T2]'
+];
+
+
+
+
+
+
 // CONCATENATED MODULE: ./src/js/geometry/sphere.js
+
 
 
 
@@ -57671,6 +56266,14 @@ class sphere_Sphere extends AbstractThreeBrainObject {
   pre_render( results ){
     const canvas = this._canvas,
           mesh = this._mesh;
+
+    // 0. check if global position is 0,0,0
+    const const_pos = mesh.userData.construct_params.position;
+    if( is_electrode(mesh) && const_pos[0] === 0 && const_pos[1] === 0 && const_pos[2] === 0 ){
+      mesh.visible = false;
+      return ;
+    }
+
     // 1. whether passed threshold
     let threshold_test = true;
     let current_value;
@@ -57707,9 +56310,51 @@ class sphere_Sphere extends AbstractThreeBrainObject {
         // get threshold criteria
         if(current_value !== undefined){
           const ranges = to_array(canvas.state_data.get('threshold_values'));
+          const opers = canvas.state_data.get('threshold_method');
           if( get_or_default(canvas.state_data, 'threshold_type', 'continuous') === 'continuous' ){
             // contunuous
             threshold_test = false;
+
+            // '|v| < T1', '|v| >= T1', 'v < T1',
+            // 'v >= T1', 'v in [T1, T2]', 'v not in [T1,T2]'
+            if( ranges.length > 0 && opers >= 0 && opers < CONSTANTS.THRESHOLD_OPERATORS.length ){
+              const opstr = CONSTANTS.THRESHOLD_OPERATORS[ opers ]
+              let t1 = ranges[0];
+
+              if( opstr === 'v = T1' && current_value == t1 ){
+                threshold_test = true;
+              } else if( opstr === '|v| < T1' && Math.abs(current_value) < t1 ){
+                threshold_test = true;
+              } else if( opstr === '|v| >= T1' && Math.abs(current_value) >= t1 ){
+                threshold_test = true;
+              } else if( opstr === 'v < T1' && current_value < t1 ){
+                threshold_test = true;
+              } else if( opstr === 'v >= T1' && current_value >= t1 ){
+                threshold_test = true;
+              } else {
+                let t2 = Math.abs(t1);
+                if( ranges.length === 1 ){
+                  t1 = -t2
+                } else {
+                  t2 = ranges[1];
+                  if( t1 > t2 ){
+                    t2 = t1;
+                    t1 = ranges[1];
+                  }
+                }
+                if( opstr === 'v in [T1, T2]' && current_value <= t2 && current_value >= t1 ){
+                  threshold_test = true;
+                } else if( opstr === 'v not in [T1,T2]' && ( current_value > t2 || current_value < t1 ) ){
+                  threshold_test = true;
+                }
+              }
+
+            } else {
+              threshold_test = true;
+            }
+
+
+            /*
             ranges.forEach((r) => {
               if(Array.isArray(r) && r.length === 2){
                 if(!threshold_test && r[1] >= current_value && r[0] <= current_value){
@@ -57717,6 +56362,7 @@ class sphere_Sphere extends AbstractThreeBrainObject {
                 }
               }
             });
+            */
           }else{
             // discrete
             threshold_test = ranges.includes( current_value );
@@ -57766,6 +56412,7 @@ class sphere_Sphere extends AbstractThreeBrainObject {
       mesh.userData.display_info.threshold_value = current_value;
       mesh.userData.display_info.display_name = canvas.state_data.get('display_variable') || '[None]';
     }
+
   }
 
   switch_material( material_type, update_canvas = false ){
@@ -58193,142 +56840,6 @@ function is_electrode(e) {
 
 
 
-// CONCATENATED MODULE: ./src/js/constants.js
-
-// Defined all the constants
-
-const CONSTANTS = {};
-
-/* ------------------------------------ Layer setups ------------------------------------
-  Defines for each camera which layers are visible.
-  Protocols are
-    Layers:
-      - 0, 2, 3: Especially reserved for main camera
-      - 1, Shared by all cameras
-      - 4, 5, 6: Reserved for side-cameras
-      - 7: reserved for all, system reserved
-      - 8: main camera only, system reserved
-      - 9 side-cameras 1 only, system reserved
-      - 10 side-cameras 2 only, system reserved
-      - 11 side-cameras 3 only, system reserved
-      - 12 side-cameras 4 only, system reserved
-      - 13 all side cameras, system reserved
-      - 14~31 invisible
-
-*/
-
-CONSTANTS.LAYER_USER_MAIN_CAMERA_0 = 0;           // User use, main camera only
-CONSTANTS.LAYER_USER_ALL_CAMERA_1 = 1;            // User use, all cameras visible
-CONSTANTS.LAYER_USER_ALL_SIDE_CAMERAS_4 = 4;      // User use, all side cameras
-CONSTANTS.LAYER_SYS_ALL_CAMERAS_7 = 7;            // System reserved, all cameras
-CONSTANTS.LAYER_SYS_MAIN_CAMERA_8 = 8;            // System reserved, main cameras only
-CONSTANTS.LAYER_SYS_CORONAL_9 = 9;                // System reserved, coronal camera only
-CONSTANTS.LAYER_SYS_AXIAL_10 = 10;                 // System reserved, axial camera only
-CONSTANTS.LAYER_SYS_SAGITTAL_11 = 11;              // System reserved, sagittal camera only
-CONSTANTS.LAYER_SYS_ALL_SIDE_CAMERAS_13 = 13;      // System reserved, all side cameras visible
-
-/* ------------------------------------ Global constants ------------------------------------
-*/
-
-// reorder render depth to force renders to render objects with maximum render order first
-CONSTANTS.MAX_RENDER_ORDER = 9999999;
-CONSTANTS.VEC_ORIGIN = new threeplugins_THREE.Vector3( 0, 0, 0 );
-// Anatomcal axis RAS is the normal XYZ, LAI is the other direction
-CONSTANTS.VEC_ANAT_R = new threeplugins_THREE.Vector3( 1, 0, 0 );
-CONSTANTS.VEC_ANAT_A = new threeplugins_THREE.Vector3( 0, 1, 0 );
-CONSTANTS.VEC_ANAT_S = new threeplugins_THREE.Vector3( 0, 0, 1 );
-CONSTANTS.VEC_ANAT_L = new threeplugins_THREE.Vector3( -1, 0, 0 );
-CONSTANTS.VEC_ANAT_P = new threeplugins_THREE.Vector3( 0, -1, 0 );
-CONSTANTS.VEC_ANAT_I = new threeplugins_THREE.Vector3( 0, 0, -1 );
-
-// You can only change which key is pressed. However, you cannot change shift & ctrl or alt
-// To do that you must go into the code
-CONSTANTS.KEY_ZOOM                    = 'KeyZ';         // z for zoom out and Z for zoom in
-CONSTANTS.KEY_CYCLE_LEFT              = 'BracketLeft';  // [ for cycle through left hemisphere material
-CONSTANTS.KEY_CYCLE_RIGHT             = 'BracketRight'; // ] for cycle through right hemisphere material
-CONSTANTS.KEY_CYCLE_ELECTRODES_NEXT   = 'Period';       // "." for choosing next electrodes
-CONSTANTS.KEY_CYCLE_ELECTRODES_PREV   = 'Comma';        // "," for choosing previous electrodes
-CONSTANTS.KEY_CYCLE_ELEC_VISIBILITY   = 'KeyV';         // 'v' for cycling through visible, hide inactive, hidden
-CONSTANTS.KEY_CYCLE_SURFACE           = 'KeyP';         // "p" for cycle through surfaces
-CONSTANTS.KEY_CYCLE_MATERIAL          = 'KeyM';         // "M" for cycle through material
-CONSTANTS.KEY_OVERLAY_CORONAL         = 'KeyC';         // 'C' for coronal
-CONSTANTS.KEY_OVERLAY_AXIAL           = 'KeyA';         // 'A' for axial
-CONSTANTS.KEY_OVERLAY_SAGITTAL        = 'KeyS';         // 'S' for sagittal
-CONSTANTS.KEY_MOVE_CORONAL            = 'KeyE';         // 'Q' for moving coronal f/b
-CONSTANTS.KEY_MOVE_AXIAL              = 'KeyQ';         // 'W' for moving axial f/b
-CONSTANTS.KEY_MOVE_SAGITTAL           = 'KeyW';         // 'E' for moving sagittal f/b
-CONSTANTS.KEY_CYCLE_ANIMATION         = 'KeyC';         // 'c' for cycling through animation clips
-CONSTANTS.KEY_TOGGLE_ANIMATION        = 'KeyS';         // 's' for play/paus animation
-CONSTANTS.KEY_CYCLE_ELEC_EDITOR       = 'Backquote';    // '`' for cycling through electrodes (localization)
-CONSTANTS.KEY_CYCLE_SURFTYPE_EDITOR   = 'Digit4';       // '4' for toggle electrode type (surface ot iEEG)
-CONSTANTS.KEY_NEW_ELECTRODE_EDITOR    = 'Digit1';       // '1' new electrode
-CONSTANTS.KEY_LABEL_FOCUS_EDITOR      = 'Digit2';       // '2' for quick edit label
-CONSTANTS.KEY_CYCLE_REMOVE_EDITOR     = 'KeyR';
-
-CONSTANTS.TOOLTIPS = {};
-CONSTANTS.TOOLTIPS.KEY_ZOOM                    = 'z/Z';
-CONSTANTS.TOOLTIPS.KEY_CYCLE_LEFT              = '[';
-CONSTANTS.TOOLTIPS.KEY_CYCLE_RIGHT             = ']';
-CONSTANTS.TOOLTIPS.KEY_CYCLE_ELECTRODES_NEXT   = '.';
-CONSTANTS.TOOLTIPS.KEY_CYCLE_ELECTRODES_PREV   = ',';
-CONSTANTS.TOOLTIPS.KEY_CYCLE_ELEC_VISIBILITY   = 'v';
-CONSTANTS.TOOLTIPS.KEY_CYCLE_SURFACE           = 'p';
-CONSTANTS.TOOLTIPS.KEY_CYCLE_MATERIAL          = '⇧M';
-CONSTANTS.TOOLTIPS.KEY_OVERLAY_CORONAL         = '⇧C';
-CONSTANTS.TOOLTIPS.KEY_OVERLAY_AXIAL           = '⇧A';
-CONSTANTS.TOOLTIPS.KEY_OVERLAY_SAGITTAL        = '⇧S';
-CONSTANTS.TOOLTIPS.KEY_MOVE_CORONAL            = 'e/E';
-CONSTANTS.TOOLTIPS.KEY_MOVE_AXIAL              = 'q/Q';
-CONSTANTS.TOOLTIPS.KEY_MOVE_SAGITTAL           = 'w/W';
-CONSTANTS.TOOLTIPS.KEY_CYCLE_ANIMATION         = 'c';
-CONSTANTS.TOOLTIPS.KEY_TOGGLE_ANIMATION        = 's';
-CONSTANTS.TOOLTIPS.KEY_CYCLE_ELEC_EDITOR       = '`';
-CONSTANTS.TOOLTIPS.KEY_CYCLE_SURFTYPE_EDITOR   = '4';
-CONSTANTS.TOOLTIPS.KEY_NEW_ELECTRODE_EDITOR    = '1';
-CONSTANTS.TOOLTIPS.KEY_LABEL_FOCUS_EDITOR      = '2';
-CONSTANTS.TOOLTIPS.KEY_CYCLE_REMOVE_EDITOR     = 'r';
-
-// Regular expressions
-CONSTANTS.REGEXP_SURFACE_GROUP    = /^Surface - (.+) \((.+)\)$/;  // Surface - pial (YAB)
-CONSTANTS.REGEXP_VOLUME_GROUP     = /^Volume - (.+) \((.+)\)$/;   // Volume - brain.finalsurfs (YAB)
-CONSTANTS.REGEXP_ELECTRODE_GROUP  = /^Electrodes \((.+)\)$/;                  // Electrodes (YAB)
-CONSTANTS.REGEXP_SURFACE          = /^([\w ]+) (Left|right) Hemisphere - (.+) \((.+)\)$/;   // Standard 141 Left Hemisphere - pial (YAB)
-CONSTANTS.REGEXP_VOLUME           = /^(.+) \((.+)\)$/;                   // brain.finalsurfs (YAB)
-CONSTANTS.REGEXP_ELECTRODE        = /^(.+), ([0-9]+) - (.*)$/;     // YAB, 1 - pSYLV12
-
-// Colors
-CONSTANTS.COLOR_MAIN_LIGHT = 0xefefef;                  // Color for main camera casting towards objects
-CONSTANTS.COLOR_AMBIENT_LIGHT = 0x808080;               // Color for ambient light that lights up all cameras
-
-
-// dat.GUI folders
-CONSTANTS.FOLDERS = {
-  'background-color'      : 'Default',
-  'sync-viewers'          : 'Default',
-  'video-recorder'        : 'Main Canvas',
-  'reset-main-camera'     : 'Main Canvas',
-  'main-camera-position'  : 'Main Canvas',
-  'toggle-helpper'        : 'Main Canvas',
-  'toggle-side-panels'    : 'Side Canvas',
-  'reset-side-panels'     : 'Side Canvas',
-  'side-three-planes'     : 'Side Canvas',
-  'side-electrode-dist'   : 'Side Canvas',
-  'subject-selector'      : 'Surface Settings',
-  'surface-selector'      : 'Surface Settings',
-  'hemisphere-material'   : 'Surface Settings',
-  'electrode-style'       : 'Electrodes',
-  'electrode-mapping'     : 'Electrodes',
-  'animation'             : 'Data Visualization'
-};
-
-
-
-
-
-
-
-
-
 // CONCATENATED MODULE: ./src/js/capture/CCFrameEncoder.js
 function CCFrameEncoder( settings ) {
 
@@ -58467,7 +56978,11 @@ class CCanvasRecorder_CCanvasRecorder extends CCFrameEncoder{
 
 
 
+// EXTERNAL MODULE: ./node_modules/downloadjs/download.js
+var downloadjs_download = __webpack_require__(0);
+
 // CONCATENATED MODULE: ./src/js/data_controls.js
+
 
 
 
@@ -58637,6 +57152,13 @@ class data_controls_THREEBRAIN_PRESETS{
 
       });
 
+    this.gui.add_item('Screenshot', () => {
+      const img = this.canvas.domElement.toDataURL('image/png');
+      const _d = new Date().toJSON();
+
+      downloadjs_download(img, `[rave-brain] ${_d}.png`, 'image/png');
+    }, {folder_name: folder_name });
+
   }
 
   // 3. Reset Camera
@@ -58700,7 +57222,7 @@ class data_controls_THREEBRAIN_PRESETS{
   // 5. display anchor
   c_toggle_anchor(){
     const folder_name = CONSTANTS.FOLDERS[ 'toggle-helpper' ];
-    this.gui.add_item('Display Helpers', false, { folder_name: folder_name })
+    this.gui.add_item('Display Coordinates', false, { folder_name: folder_name })
       .onChange((v) => {
         this.canvas.set_cube_anchor_visibility(v);
         this.fire_change();
@@ -58745,6 +57267,7 @@ class data_controls_THREEBRAIN_PRESETS{
     }, {folder_name: folder_name});
 
     // reset first
+    this.canvas._side_width = side_width;
     this.canvas.reset_side_canvas( zoom_level, side_width, side_shift );
   }
 
@@ -58752,12 +57275,29 @@ class data_controls_THREEBRAIN_PRESETS{
   c_side_depth(){
     const folder_name = CONSTANTS.FOLDERS[ 'side-three-planes' ];
 
+    const _calculate_intersection_coord = () => {
+      console.debug('Recalculate MNI305 for plane intersections');
+      // MNI 305 position of the intersection
+      const ints_z = this.canvas.state_data.get( 'axial_posz' ) || 0,
+            ints_y = this.canvas.state_data.get( 'coronal_posy' ) || 0,
+            ints_x = this.canvas.state_data.get( 'sagittal_posx' ) || 0;
+      const point = new threeplugins_THREE.Vector3().set(ints_x, ints_y, ints_z);
+      this.canvas.calculate_mni305( point );
+      // set controller
+      _controller_mni305.setValue(`${point.x.toFixed(1)}, ${point.y.toFixed(1)}, ${point.z.toFixed(1)}`);
+    };
+
+    this.canvas.bind( 'c_side_depth_subject_changed', 'switch_subject', (e) => {
+		  _calculate_intersection_coord();
+		}, this.canvas.el);
+
     // side plane
     const _controller_coronal = this.gui
       .add_item('Coronal (P - A)', 0, {folder_name: folder_name})
       .min(-128).max(128).step(1).onChange((v) => {
         this.canvas.set_coronal_depth( v );
         this.fire_change({ 'coronal_depth' : v });
+        _calculate_intersection_coord();
       });
     this.gui.add_tooltip( CONSTANTS.TOOLTIPS.KEY_MOVE_CORONAL, 'Coronal (P - A)', folder_name);
 
@@ -58766,6 +57306,7 @@ class data_controls_THREEBRAIN_PRESETS{
       .min(-128).max(128).step(1).onChange((v) => {
         this.canvas.set_axial_depth( v );
         this.fire_change({ 'axial_depth' : v });
+        _calculate_intersection_coord();
       });
     this.gui.add_tooltip( CONSTANTS.TOOLTIPS.KEY_MOVE_AXIAL, 'Axial (I - S)', folder_name);
 
@@ -58774,8 +57315,12 @@ class data_controls_THREEBRAIN_PRESETS{
       .min(-128).max(128).step(1).onChange((v) => {
         this.canvas.set_sagittal_depth( v );
         this.fire_change({ 'sagittal_depth' : v });
+        _calculate_intersection_coord();
       });
     this.gui.add_tooltip( CONSTANTS.TOOLTIPS.KEY_MOVE_SAGITTAL, 'Sagittal (L - R)', folder_name);
+
+    const _controller_mni305 = this.gui
+      .add_item('Intersect MNI305', "NaN, NaN, NaN", {folder_name: folder_name});
 
     this.fire_change({ 'coronal_depth' : 0 });
     this.fire_change({ 'axial_depth' : 0 });
@@ -59123,6 +57668,11 @@ class data_controls_THREEBRAIN_PRESETS{
     const do_mapping = this.gui.add_item('Map Electrodes', false, { folder_name : folder_name })
       .onChange((v) => {
         this.canvas.switch_subject( '/', { 'map_template': v });
+        if( v ){
+          this.gui.show_item(['Surface Mapping', 'Volume Mapping'], folder_name);
+        } else {
+          this.gui.hide_item(['Surface Mapping', 'Volume Mapping'], folder_name);
+        }
         this.fire_change();
       });
 
@@ -59141,6 +57691,9 @@ class data_controls_THREEBRAIN_PRESETS{
         this.canvas.switch_subject( '/', { 'map_type_volume': v });
         this.fire_change();
       });
+
+    // hide mapping options
+    this.gui.hide_item(['Surface Mapping', 'Volume Mapping'], folder_name);
 
     // need to check if this is multiple subject case
     if( this.canvas.shared_data.get(".multiple_subjects") ){
@@ -59217,11 +57770,17 @@ class data_controls_THREEBRAIN_PRESETS{
     const step = 0.001,
           folder_name = CONSTANTS.FOLDERS[ 'animation' ];
 
-    let names = Object.keys( this.settings.color_maps ),
+    let cnames = Object.keys( this.settings.color_maps ),
+        names = ['[None]'],
         initial = this.settings.default_colormap;
 
     // Make sure the initial value exists, and [None] is included in the option
-    names = [...new Set(['[None]', ...names])];
+    cnames.forEach(n => {
+      if( n === 'Subject' && cnames.includes('[Subject]') ){
+        return;
+      }
+      names.push( n );
+    });
     this._animation_names = names;
 
     if( !initial || !names.includes( initial ) || initial.startsWith('[') ){
@@ -59273,10 +57832,13 @@ class data_controls_THREEBRAIN_PRESETS{
           // reset color-range
           if( cmap.value_type === 'continuous' ){
 
+            val_range.setValue( this.__display_range_continuous || '' );
+
+            /*
              val_range.setValue(
                `${cmap.lut.minV.toPrecision(5)},${cmap.lut.maxV.toPrecision(5)}`
              );
-
+            */
             this.gui.show_item(['Display Range'], folder_name);
           }else{
             val_range.setValue(',');
@@ -59299,36 +57861,73 @@ class data_controls_THREEBRAIN_PRESETS{
         return;
       }
 
+      const previous_type = this.canvas.state_data.get('threshold_type');
+      const previous_value = this.canvas.state_data.get('threshold_type');
+
       // set flags to canvas
       this.canvas.state_data.set('threshold_active', true);
       this.canvas.state_data.set('threshold_variable', v);
 
       if(cmap.value_type === 'continuous'){
         this.canvas.state_data.set('threshold_type', 'continuous');
-        let b;
-        let lb = cmap.value_range[0].toPrecision(5),
-            ub = cmap.value_range[1].toPrecision(5);
-        b = lb.substring(0,6) - 0.1;
-        lb = b.toPrecision(5) + lb.substring(6);
-        b = ub.substring(0,6) - (-0.1);
-        ub = b.toPrecision(5) + ub.substring(6);
+        this.gui.show_item('Threshold Method');
 
-        thres_range.setValue(`${lb},${ub}`);
+        if( previous_type !== 'continuous' ){
+          thres_range.setValue( this.__threshold_values_continuous || '' );
+        }
+
       }else{
         // '' means no threshold
         this.canvas.state_data.set('threshold_type', 'discrete');
         thres_range.setValue(cmap.value_names.join('|'));
+        this.gui.hide_item('Threshold Method');
       }
     };
 
     const ani_name = this.gui.add_item('Display Data', initial, { folder_name : folder_name, args : names })
-      .onChange((v) => { _ani_name_onchange( v ); this.fire_change(); });
+      .onChange((v) => {
+        _ani_name_onchange( v );
+        this.fire_change();
+        this._update_canvas();
+      });
     this.gui.add_tooltip( CONSTANTS.TOOLTIPS.KEY_CYCLE_ANIMATION, 'Display Data', folder_name);
 
     this._ani_name = ani_name;
-    const val_range = this.gui.add_item('Display Range', '~', { folder_name : folder_name })
+    const val_range = this.gui.add_item('Display Range', '', { folder_name : folder_name })
       .onChange((v) => {
         let ss = v;
+        v = v.split(',').map(x => {
+          return( parseFloat(x) );
+        }).filter(x => {
+          return( !isNaN(x) );
+        });
+
+
+        if( v.length > 0 && !(v.length === 1 && v[0] === 0) ){
+          let v1 = v[0], v2 = Math.abs(v[0]);
+          if( v.length == 1 ){
+            v1 = -v2;
+          }else{
+            v2 = v[1];
+          }
+
+          // Set cmap value range
+          this.__display_range_continuous = ss;
+          this.canvas.switch_colormap( undefined, [v1, v2] );
+          // reset animation tracks
+
+        } else {
+          const cmap = this.canvas.switch_colormap();
+          if( cmap.value_type === 'continuous' ){
+            this.__display_range_continuous = '';
+            this.canvas.switch_colormap( undefined, [
+              cmap.value_range[0],
+              cmap.value_range[1]
+            ] );
+          }
+
+        }
+        /*
         if( v.match(/[^0-9,-.eE~]/) ){
           // illegal chars
           ss = Array.from(v).map((s) => {
@@ -59340,26 +57939,37 @@ class data_controls_THREEBRAIN_PRESETS{
           vr[0] = parseFloat( vr[0] );
           vr[1] = parseFloat( vr[1] );
         }
+
         if( !isNaN( vr[0] ) && !isNaN( vr[1] ) ){
           // Set cmap value range
           this.canvas.switch_colormap( undefined, vr );
           // reset animation tracks
           this.canvas.generate_animation_clips( ani_name.getValue() , true );
         }
+        */
+        this.canvas.generate_animation_clips( ani_name.getValue() , true );
         this.fire_change();
+        this._update_canvas();
 
       });
 
     const thres_name = this.gui.add_item('Threshold Data', '[None]', { folder_name : folder_name, args : names })
-      .onChange((v) => { _thres_name_onchange( v ); this.fire_change(); });
+      .onChange((v) => {
+        _thres_name_onchange( v );
+        this.fire_change();
+        this._update_canvas();
+      });
     this._thres_name = thres_name;
 
     const thres_range = this.gui.add_item('Threshold Range', '', { folder_name : folder_name })
       .onChange((v) => {
         const is_continuous = get_or_default(this.canvas.state_data, 'threshold_type', 'discrete') == 'continuous';
-        let candidates = v.split('|').map((x) => { return(x.trim()); });
+        let candidates = v.split(/[\|,]/).map((x) => { return(x.trim()); });
 
         if(is_continuous){
+          candidates = candidates.map(x => { return(parseFloat(x)); })
+                                 .filter(x => { return(!isNaN(x)); });
+          /*
           candidates = candidates.map((x) => {
             let s = Array.from(x).map((s) => {
               return( '0123456789.,-eE~'.indexOf(s) === -1 ? '' : s );
@@ -59375,12 +57985,31 @@ class data_controls_THREEBRAIN_PRESETS{
             }
             return(s);
           });
+          */
+          this.__threshold_values_continuous = v;
         }
         // set flag
+
         this.canvas.state_data.set('threshold_values', candidates);
         this.fire_change();
         this._update_canvas();
       });
+
+    const thres_method = this.gui.add_item('Threshold Method', '|v| >= T1', { folder_name : folder_name, args : CONSTANTS.THRESHOLD_OPERATORS })
+      .onChange((v) => {
+        const is_continuous = get_or_default(this.canvas.state_data, 'threshold_type', 'discrete') == 'continuous';
+        if( is_continuous ){
+          const op = CONSTANTS.THRESHOLD_OPERATORS.indexOf(v);
+          if( op > -1 ){
+            this.canvas.state_data.set('threshold_method', op);
+            this.fire_change();
+            this._update_canvas();
+          }
+        }else{
+          // TODO: handle discrete data
+        }
+      });
+    this.canvas.state_data.set('threshold_method', 2);
 
     this._ani_status = this.gui.add_item( 'Play/Pause', false,
                                           { folder_name : folder_name },
@@ -59455,7 +58084,24 @@ class data_controls_THREEBRAIN_PRESETS{
 
   }
 
-  // 16.
+  // 16. Highlight selected electrodes and info
+  c_display_highlights(){
+    const folder_name = CONSTANTS.FOLDERS['highlight-selection'] || 'Data Visualization';
+    this.gui.add_item('Highlight Box', true, { folder_name : folder_name })
+      .onChange((v) => {
+        this.canvas.state_data.set( 'highlight_disabled', !v );
+        this.canvas.focus_object( this.canvas.object_chosen );
+        this.fire_change();
+        this._update_canvas(0);
+      });
+
+    this.gui.add_item('Info Text', true, { folder_name : folder_name })
+      .onChange((v) => {
+        this.canvas.state_data.set( 'info_text_disabled', !v );
+        this.fire_change();
+        this._update_canvas(0);
+      });
+  }
 
 
 
@@ -59548,9 +58194,9 @@ class data_controls_THREEBRAIN_PRESETS{
           el.userData.construct_params.is_surface_electrode = (v === 'Surface');
         }
         if( v === 'Depth' ){
-          this.gui.get_controller('Overlay Coronal', 'Side Canvas').setValue( true );
-          this.gui.get_controller('Overlay Axial', 'Side Canvas').setValue( true );
-          this.gui.get_controller('Overlay Sagittal', 'Side Canvas').setValue( true );
+          this.gui.get_controller('Overlay Coronal', 'Volume Settings').setValue( true );
+          this.gui.get_controller('Overlay Axial', 'Volume Settings').setValue( true );
+          this.gui.get_controller('Overlay Sagittal', 'Volume Settings').setValue( true );
           this.gui.get_controller('Left Hemisphere', 'Geometry').setValue( 'hidden' );
           this.gui.get_controller('Right Hemisphere', 'Geometry').setValue( 'hidden' );
         }else if ( v === 'Surface' ){
@@ -59817,8 +58463,8 @@ class data_controls_THREEBRAIN_PRESETS{
     }, 'edit-gui_edit_label');*/
 
     // close other folders
-    this.gui.folders["Main Canvas"].close();
-    this.gui.folders["Side Canvas"].close();
+    this.gui.folders["Default"].close();
+    this.gui.folders["Volume Settings"].close();
     this.gui.folders[ folder_name ].open();
 
     // hide 3 planes
@@ -59953,12 +58599,13 @@ class data_controls_THREEBRAIN_CONTROL{
   remember( args ){
 
     const keys = [
-      "Background Color", "Display Helpers", "Show Panels", "Coronal (P - A)",
+      "Background Color", "Camera Position", "Display Coordinates", "Show Panels", "Coronal (P - A)",
       "Axial (I - S)", "Sagittal (L - R)", "Overlay Coronal", "Overlay Axial", "Overlay Sagittal",
       "Dist. Threshold", "Surface Type", "Surface Material", "Left Hemisphere", "Right Hemisphere",
       "Left Opacity", "Right Opacity",
       "Map Electrodes", "Surface Mapping", "Volume Mapping", "Visibility", "Display Data",
-      "Display Range", "Threshold Data", "Threshold Range", "Show Legend", "Show Time"
+      "Display Range", "Threshold Data", "Threshold Range", "Threshold Method",
+      "Show Legend", "Show Time", "Highlight Box", "Info Text"
     ];
 
     keys.forEach((k) => {
@@ -60318,6 +58965,7 @@ class shiny_tools_THREE_BRAIN_SHINY {
     }
   }
 
+  // FIXME: this handler is Broken
   handle_add_clip( args ){
     // window.aaa = args;
     const clip_name = args.clip_name,
@@ -60331,7 +58979,8 @@ class shiny_tools_THREE_BRAIN_SHINY {
           color_keys = to_array( args.color_keys ),
           color_vals = to_array( args.color_vals ),
           n_levels = args.n_levels,
-          focusui = args.focus || false;
+          focusui = args.focus || false,
+          alias = args.alias;
 
     if(typeof mesh_name !== 'string'){ return; }
 
@@ -60342,7 +58991,7 @@ class shiny_tools_THREE_BRAIN_SHINY {
     mesh.userData.add_track_data( clip_name, data_type, value, time );
 
     // calculate cmap
-    this.canvas.add_colormap( clip_name, data_type, value_names, value_range, time_range,
+    this.canvas.add_colormap( clip_name, alias, data_type, value_names, value_range, time_range,
                 color_keys, color_vals, n_levels );
 
     // Add to gui
@@ -62186,10 +60835,7 @@ class compass_Compass {
 
 
 // EXTERNAL MODULE: ./node_modules/json-2-csv/src/converter.js
-var converter = __webpack_require__(5);
-
-// EXTERNAL MODULE: ./node_modules/downloadjs/download.js
-var downloadjs_download = __webpack_require__(3);
+var converter = __webpack_require__(4);
 
 // CONCATENATED MODULE: ./src/js/threejs_scene.js
 
@@ -62218,6 +60864,7 @@ const GEOMETRY_FACTORY = {
   'blank'     : (g, canvas) => { return(null) }
 };
 
+window.threeBrain_GEOMETRY_FACTORY = GEOMETRY_FACTORY;
 /* ------------------------------------ Layer setups ------------------------------------
   Defines for each camera which layers are visible.
   Protocols are
@@ -62285,6 +60932,7 @@ class threejs_scene_THREEBRAIN_CANVAS {
 
     // Side panel initial size in pt
     this.side_width = side_width;
+    this._side_width = side_width;
 
     // Indicator of whether we are in R-shiny environment, might change the name in the future if python, matlab are supported
     this.shiny_mode = shiny_mode;
@@ -62828,7 +61476,7 @@ class threejs_scene_THREEBRAIN_CANVAS {
 
     // root is a green cube that's only visible in side cameras
     mouse_helper_root.layers.set( CONSTANTS.LAYER_SYS_ALL_SIDE_CAMERAS_13 );
-    mouse_helper.layers.set( CONSTANTS.LAYER_SYS_MAIN_CAMERA_8 );
+    mouse_helper.children.forEach( el => { el.layers.set( CONSTANTS.LAYER_SYS_ALL_SIDE_CAMERAS_13 ); } );
 
     // In side cameras, always render mouse_helper_root on top
     mouse_helper_root.renderOrder = CONSTANTS.MAX_RENDER_ORDER;
@@ -62870,6 +61518,17 @@ class threejs_scene_THREEBRAIN_CANVAS {
     this.json_loader = new threeplugins_THREE.FileLoader( this.loader_manager );
     this.font_loader = new threeplugins_THREE.FontLoader( this.loader_manager );
 
+  }
+
+  dispatch_event( type, data ){
+    let event = new CustomEvent(type, {
+      container_id: this.container_id,
+      detail: data
+    });
+    // elem.addEventListener('build', function (e) { /* ... */ }, false);
+
+    // Dispatch the event.
+    this.el.dispatchEvent(event);
   }
 
   add_to_scene( m, global = false ){
@@ -63247,15 +61906,18 @@ class threejs_scene_THREEBRAIN_CANVAS {
 
   highlight( m, reset = false ){
 
+    const highlight_disabled = get_or_default( this.state_data, 'highlight_disabled', false );
+
     // use bounding box with this.focus_box
     if( !m || !m.isObject3D ){ return(null); }
 
     this.focus_box.setFromObject( m );
     if( !this.focus_box.userData.added ){
+      this.focus_box.userData.added = true;
       this.add_to_scene( this.focus_box, true );
     }
 
-    this.focus_box.visible = !reset;
+    this.focus_box.visible = !reset && !highlight_disabled;
 
     // check if there is highlight helper
     if( m.children.length > 0 ){
@@ -63449,8 +62111,8 @@ class threejs_scene_THREEBRAIN_CANVAS {
 
   }
 
-  add_colormap( name, value_type, value_names, value_range, time_range,
-                color_keys, color_vals, n_levels ){
+  add_colormap( name, alias, value_type, value_names, value_range, time_range,
+                color_keys, color_vals, n_levels, hard_range ){
 
     const color_name = name + '--'  + this.container_id;
 
@@ -63483,14 +62145,29 @@ class threejs_scene_THREEBRAIN_CANVAS {
       lut.setMax( Math.max( n_levels - 1, 1) );
     }
 
+    // step 3: register hard range
+    let theoretical_range;
+    if( Array.isArray(hard_range) && hard_range.length == 2 ){
+      theoretical_range = [hard_range[0], hard_range[1]];
+    }
+
+    // step 4: set alias
+    let alt_name = alias;
+    if( typeof alt_name !== 'string' || alt_name === '' ){
+      alt_name = name;
+    }
+
     this.color_maps.set( name, {
-      lut: lut,
-      value_type: value_type,
-      value_names: to_array( value_names ),
-      time_range: time_range,
-      n_levels: n_levels,
+      lut               : lut,
+      name              : name,
+      alias             : alt_name,
+      value_type        : value_type,
+      value_names       : to_array( value_names ),
+      time_range        : time_range,
+      n_levels          : n_levels,
       // Used for back-up
-      value_range : [ lut.minV, lut.maxV ]
+      value_range       : [ lut.minV, lut.maxV ],
+      theoretical_range : theoretical_range
     });
 
   }
@@ -63519,9 +62196,28 @@ class threejs_scene_THREEBRAIN_CANVAS {
     if( cmap && value_range.length === 2 && value_range[0] < value_range[1] &&
         // Must be continuous color map
         cmap.value_type === 'continuous' ){
+      // Check hard ranges
+      const hard_range = cmap.theoretical_range;
+      let minv = value_range[0],
+          maxv = value_range[1];
+      if( Array.isArray(hard_range) && hard_range.length == 2 ){
+        if( minv < hard_range[0] ){
+          minv = hard_range[0];
+          if( maxv < minv ){
+            maxv = minv + 1e-100;
+          }
+        }
+        if( maxv > hard_range[1] ){
+          maxv = hard_range[1];
+          if( maxv < minv ){
+            minv = maxv - 1e-100;
+          }
+        }
+      }
+
       // set cmap value_range
-      cmap.lut.setMax( value_range[1] );
-      cmap.lut.setMin( value_range[0] );
+      cmap.lut.setMax( maxv );
+      cmap.lut.setMin( minv );
       // Legend needs to be updated
       this.start_animation( 0 );
     }
@@ -63635,11 +62331,15 @@ class threejs_scene_THREEBRAIN_CANVAS {
     this.main_camera.updateProjectionMatrix();
   }
   reset_side_canvas( zoom_level, side_width, side_position ){
-    if( side_width ){
-      this.side_width = side_width;
-    }else{
-      side_width = this.side_width;
+    let _sw = side_width;
+    if( !_sw ){
+      _sw = this._side_width;
     }
+    if( _sw * 3 > this.client_height ){
+      _sw = Math.floor( this.client_height / 3 );
+    }
+    this.side_width = _sw;
+    // Resize side canvas, make sure this.side_width is proper
     this.side_canvas.coronal.reset( zoom_level );
     this.side_canvas.axial.reset( zoom_level );
     this.side_canvas.sagittal.reset( zoom_level );
@@ -63651,17 +62351,16 @@ class threejs_scene_THREEBRAIN_CANVAS {
       side_position[1] = Math.max( side_position[1], -el_pos.y );
 
       this.side_canvas.coronal.container.style.top = side_position[1] + 'px';
-      this.side_canvas.axial.container.style.top = (side_position[1] + side_width) + 'px';
-      this.side_canvas.sagittal.container.style.top = (side_position[1] + side_width * 2) + 'px';
+      this.side_canvas.axial.container.style.top = (side_position[1] + _sw) + 'px';
+      this.side_canvas.sagittal.container.style.top = (side_position[1] + _sw * 2) + 'px';
 
       this.side_canvas.coronal.container.style.left = side_position[0] + 'px';
       this.side_canvas.axial.container.style.left = side_position[0] + 'px';
       this.side_canvas.sagittal.container.style.left = side_position[0] + 'px';
     }
 
-
-    // Resize side canvas
     this.handle_resize( undefined, undefined );
+
   }
 
   reset_side_cameras( pos, scale = 300, distance = 500 ){
@@ -63868,6 +62567,7 @@ class threejs_scene_THREEBRAIN_CANVAS {
           position        : this.object_chosen.getWorldPosition( new threeplugins_THREE.Vector3() ),
           custom_info     : this.object_chosen.userData.construct_params.custom_info,
           is_electrode    : this.object_chosen.userData.construct_params.is_electrode || false,
+          MNI305_position : this.object_chosen.userData.MNI305_position,
           template_mapping : {
             mapped        : this.object_chosen.userData._template_mapped || false,
             shift         : this.object_chosen.userData._template_shift || 0,
@@ -63993,6 +62693,10 @@ class threejs_scene_THREEBRAIN_CANVAS {
 
     const cmap = this.switch_colormap();
 
+    // Added: if info text is disabled, then legend should not display
+    // correspoding value
+    const info_disabled = this.state_data.get( 'info_text_disabled');
+
     // whether to draw legend
     const has_color_map = this.render_legend && cmap && (cmap.lut.n !== undefined);
 
@@ -64002,20 +62706,26 @@ class threejs_scene_THREEBRAIN_CANVAS {
     }
     const lut = cmap.lut,
           color_type = cmap.value_type,
-          color_names = cmap.value_names;
+          color_names = cmap.value_names,
+          legend_title = cmap.alias || '',
+          actual_range = to_array( cmap.value_range );
 
     this._lineHeight_legend = this._lineHeight_legend || Math.round( 15 * this.pixel_ratio[0] );
     this._fontSize_legend = this._fontSize_legend || Math.round( 10 * this.pixel_ratio[0] );
 
     let legend_width = 25 * this.pixel_ratio[0],
-        legend_offset = this._fontSize_legend * 7 + legend_width; // '__-1.231e+5__', more than 16 chars
+        legend_offset = this._fontSize_legend * 7 + legend_width, // '__-1.231e+5__', more than 16 chars
+        title_offset = Math.ceil(
+          legend_title.length * this._fontSize_legend * 0.42 -
+          legend_width / 2 + legend_offset
+        );
 
     // Get color map from lut
     const continuous_cmap = has_color_map && color_type === 'continuous' && lut.n > 1;
     const discrete_cmap = has_color_map && color_type === 'discrete' && lut.n > 0 && Array.isArray(color_names);
 
-    let legend_height = 0.60,                  // Legend takes 60% of the total heights
-        legend_start = 0.25;                  // Legend starts at 20% of the height
+    let legend_height = 0.50,                  // Legend takes 60% of the total heights
+        legend_start = 0.30;                  // Legend starts at 20% of the height
 
     if( continuous_cmap ){
       // Create a linear gradient map
@@ -64037,16 +62747,38 @@ class threejs_scene_THREEBRAIN_CANVAS {
       this.domContext.fillStyle = grd;
       this.domContext.fillRect( w - legend_offset , legend_start * h , legend_width , legend_height * h );
 
-      // Add value labels
+      // Add value labels and title
       let legent_ticks = [];
       let zero_height = ( legend_start + lut.maxV * legend_height /
                           (lut.maxV - lut.minV)) * h,
           minV_height = (legend_height + legend_start) * h,
           maxV_height = legend_start * h;
+      //  For ticks
+      let text_offset = Math.round( legend_offset - legend_width ),
+          text_start = Math.round( w - text_offset + this._fontSize_legend ),
+          text_halfheight = Math.round( this._fontSize_legend * 0.21 );
 
+      // title. It should be 2 lines above legend grid
+      this.domContext.font = `${ this._fontSize_legend }px ${ this._fontType }`;
+      this.domContext.fillStyle = this.foreground_color;
+
+      // console.log(`${w - legend_offset}, ${maxV_height - this._lineHeight_legend * 3 + text_halfheight}, ${this.domContext.font}, ${legend_title}`);
+      this.domContext.fillText( legend_title, w - title_offset,
+          maxV_height - this._lineHeight_legend * 2 + text_halfheight );
+
+      if( actual_range.length == 2 ){
+        let vrange = `${actual_range[0].toPrecision(4)} ~ ${actual_range[1].toPrecision(4)}`;
+        vrange = vrange.replace(/\.[0]+\ ~/, ' ~')
+                       .replace(/\.[0]+$/, '').replace(/\.[0]+e/, 'e');
+        this.domContext.fillText( `[${vrange}]`, w - Math.ceil( legend_offset * 1.2 ),
+          minV_height + this._lineHeight_legend * 2 + text_halfheight );
+      }
+
+
+      // ticks
       let draw_zero = lut.minV < 0 && lut.maxV > 0;
 
-      if( typeof( results.current_value ) === 'number' ){
+      if( !info_disabled && typeof( results.current_value ) === 'number' ){
         // There is a colored object rendered, display it
         let value_height = ( legend_start + (lut.maxV - results.current_value) * legend_height / (lut.maxV - lut.minV)) * h;
 
@@ -64085,12 +62817,7 @@ class threejs_scene_THREEBRAIN_CANVAS {
       this.domContext.fillStyle = this.foreground_color;
 
       // Fill text
-      //  150 = 200 - 50
-      let text_offset = Math.round( legend_offset - legend_width ),
-          text_start = Math.round( w - text_offset + this._fontSize_legend ),
-          text_halfheight = Math.round( this._fontSize_legend * 0.21 );
       legent_ticks.forEach((tick) => {
-
         if( tick[2] === 1 ){
           this.domContext.font = `bold ${ this._fontSize_legend }px ${ this._fontType }`;
           this.domContext.fillText( tick[0], text_start, tick[1] + text_halfheight );
@@ -64144,9 +62871,15 @@ class threejs_scene_THREEBRAIN_CANVAS {
           text_halfheight = Math.round( this._fontSize_legend * 0.21 );
 
 
+
       this.domContext.font = `${ this._fontSize_legend }px ${ this._fontType }`;
       this.domContext.strokeStyle = this.foreground_color;
 
+
+      // Draw title. It should be 1 lines above legend grid
+      this.domContext.fillText( legend_title, w - title_offset, legend_start * h - 50 );
+
+      // Draw Ticks
       for(let ii = 0; ii < n_factors; ii++ ){
         let square_center = (legend_start + legend_step * ii) * h;
         this.domContext.fillStyle = '#' + lut.getColor(ii).getHexString();
@@ -64162,7 +62895,7 @@ class threejs_scene_THREEBRAIN_CANVAS {
 
         this.domContext.fillStyle = this.foreground_color;
 
-        if( results.current_value === color_names[ii]){
+        if( !info_disabled && results.current_value === color_names[ii]){
           this.domContext.font = `bold ${ this._fontSize_legend }px ${ this._fontType }`;
           this.domContext.fillText(color_names[ii],
             text_start, square_center + text_halfheight, w - text_start - 1
@@ -64181,11 +62914,12 @@ class threejs_scene_THREEBRAIN_CANVAS {
   }
 
   _draw_focused_info( results, x = 10, y = 10, w = 100, h = 100 ){
-    // Add selected object information
-    if( !results.selected_object ){
+    // Add selected object information, or if not showing is set
+    if( !results.selected_object || this.state_data.get( 'info_text_disabled') ){
       // no object selected, discard
       return( null );
     }
+
 
     this._lineHeight_normal = this._lineHeight_normal || Math.round( 25 * this.pixel_ratio[0] );
     this._lineHeight_small = this._lineHeight_small || Math.round( 15 * this.pixel_ratio[0] );
@@ -64196,11 +62930,17 @@ class threejs_scene_THREEBRAIN_CANVAS {
 
     this.domContext.font = `${ this._fontSize_normal }px ${ this._fontType }`;
 
+    let text_left;
+    if( this.has_side_cameras ){
+      text_left = w - Math.ceil( 50 * this._fontSize_normal * 0.42 );
+    } else {
+      text_left = Math.ceil( this._fontSize_normal * 0.42 * 2 );
+    }
     let text_position = [
-      w - Math.ceil( 50 * this._fontSize_normal * 0.42 ),
+      text_left,
 
       // Make sure it's not hidden by control panel
-      this._lineHeight_normal + this.pixel_ratio[0] * 10
+      this._lineHeight_normal + this._lineHeight_small + this.pixel_ratio[0] * 10
     ];
 
     // Line 1: object name
@@ -64210,13 +62950,26 @@ class threejs_scene_THREEBRAIN_CANVAS {
     this.domContext.font = `${ this._fontSize_small }px ${ this._fontType }`;
 
     // Line 2: Global position
-    text_position[ 1 ] = text_position[ 1 ] + this._lineHeight_small;
 
-    const pos = results.selected_object.position;
-    this.domContext.fillText(
-      `global position: (${pos.x.toFixed(2)},${pos.y.toFixed(2)},${pos.z.toFixed(2)})`,
-      text_position[ 0 ], text_position[ 1 ]
-    );
+    let pos;
+    if( results.selected_object.is_electrode ){
+      pos = results.selected_object.MNI305_position;
+      if( pos.x !== 0 || pos.y !== 0 || pos.z !== 0 ){
+        text_position[ 1 ] = text_position[ 1 ] + this._lineHeight_small;
+        this.domContext.fillText(
+          `MNI305 position: (${pos.x.toFixed(2)},${pos.y.toFixed(2)},${pos.z.toFixed(2)})`,
+          text_position[ 0 ], text_position[ 1 ]
+        );
+      }
+    } else {
+      pos = results.selected_object.position;
+      text_position[ 1 ] = text_position[ 1 ] + this._lineHeight_small;
+      this.domContext.fillText(
+        `Global position: (${pos.x.toFixed(2)},${pos.y.toFixed(2)},${pos.z.toFixed(2)})`,
+        text_position[ 0 ], text_position[ 1 ]
+      );
+    }
+
 
     // More information:
 
@@ -64228,44 +62981,48 @@ class threejs_scene_THREEBRAIN_CANVAS {
 
       const _tn = this.object_chosen.userData.display_info.threshold_name || '[None]';
       let _tv = this.object_chosen.userData.display_info.threshold_value;
-      if( _tv === undefined ){
-        _tv = '<NA>';
-      }else if( typeof _tv === 'number' ){
+      if( typeof _tv === 'number' ){
         _tv = _tv.toPrecision(4);
       }
 
       const _dn = this.object_chosen.userData.display_info.display_name;
       let _dv = results.current_value;
 
-      if( _dv === undefined ){
-        _dv = '<NA>';
-      }else if( typeof _dv === 'number' ){
+      if( typeof _dv === 'number' ){
         _dv = _dv.toPrecision(4);
       }
 
       // Line 3: mapping method & surface type
+      /*
       text_position[ 1 ] = text_position[ 1 ] + this._lineHeight_small;
 
       this.domContext.fillText(
-        `surface: ${ _m.surface }, shift vs. MNI305: ${ _m.shift.toFixed(2) }`,
+        `Surface: ${ _m.surface }, shift vs. MNI305: ${ _m.shift.toFixed(2) }`,
         text_position[ 0 ], text_position[ 1 ]
       );
+      */
 
       // Line 4:
-      text_position[ 1 ] = text_position[ 1 ] + this._lineHeight_small;
+      if( _dv !== undefined ){
+        text_position[ 1 ] = text_position[ 1 ] + this._lineHeight_small;
 
-      this.domContext.fillText(
-        `display: ${ _dn } (${ _dv })`,
-        text_position[ 0 ], text_position[ 1 ]
-      );
+        this.domContext.fillText(
+          `Display:   ${ _dn } (${ _dv })`,
+          text_position[ 0 ], text_position[ 1 ]
+        );
+      }
+
 
       // Line 5:
-      text_position[ 1 ] = text_position[ 1 ] + this._lineHeight_small;
+      if( _tv !== undefined ){
+        text_position[ 1 ] = text_position[ 1 ] + this._lineHeight_small;
 
-      this.domContext.fillText(
-        `threshold: ${ _tn } (${ _tv })`,
-        text_position[ 0 ], text_position[ 1 ]
-      );
+        this.domContext.fillText(
+          `Threshold: ${ _tn } (${ _tv })`,
+          text_position[ 0 ], text_position[ 1 ]
+        );
+      }
+
 
     }
 
@@ -65306,6 +64063,21 @@ class threejs_scene_THREEBRAIN_CANVAS {
     let map_type_volume = args.map_type_volume || state.get( 'map_type_volume' ) || 'mni305';
     let surface_opacity_left = args.surface_opacity_left || state.get( 'surface_opacity_left' ) || 1;
     let surface_opacity_right = args.surface_opacity_right || state.get( 'surface_opacity_right' ) || 1;
+    //let v2v_orig = get_or_default( this.shared_data, target_subject, {} ).vox2vox_MNI305;
+    let v2v_orig = this.shared_data.get( target_subject ).vox2vox_MNI305;
+    let anterior_commissure = state.get('anterior_commissure') || new threeplugins_THREE.Vector3();
+    anterior_commissure.set(0,0,0);
+
+    let tkRAS_MNI305 = state.get('tkRAS_MNI305') || new threeplugins_THREE.Matrix4();
+    tkRAS_MNI305.set(1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1);
+    if(Array.isArray(v2v_orig) && v2v_orig.length == 4 && v2v_orig[3].length == 4 ){
+      tkRAS_MNI305.set( v2v_orig[0][0], v2v_orig[0][1], v2v_orig[0][2], v2v_orig[0][3],
+        v2v_orig[1][0], v2v_orig[1][1], v2v_orig[1][2], v2v_orig[1][3],
+        v2v_orig[2][0], v2v_orig[2][1], v2v_orig[2][2], v2v_orig[2][3],
+        v2v_orig[3][0], v2v_orig[3][1], v2v_orig[3][2], v2v_orig[3][3] );
+      const MNI305_tkRAS = new threeplugins_THREE.Matrix4().getInverse( tkRAS_MNI305 );
+      anterior_commissure.setFromMatrixPosition( MNI305_tkRAS );
+    }
 
     this.switch_volume( target_subject, volume_type );
     this.switch_ct( target_subject, ct_type, ct_threshold );
@@ -65333,9 +64105,36 @@ class threejs_scene_THREEBRAIN_CANVAS {
     state.set( 'map_type_volume', map_type_volume );
     state.set( 'surface_opacity_left', surface_opacity_left );
     state.set( 'surface_opacity_right', surface_opacity_right );
+    state.set( 'anterior_commissure', anterior_commissure );
+    state.set( 'tkRAS_MNI305', tkRAS_MNI305 );
+
+    // reset origin to AC
+    // this.origin.position.copy( anterior_commissure );
+
+    this.dispatch_event(
+      'switch_subject',
+      {
+        target_subject: target_subject
+      }
+    );
 
     this.start_animation( 0 );
 
+  }
+
+  calculate_mni305(vec, nan_if_trans_not_found = true){
+    if( !vec.isVector3 ){
+      throw('vec must be a THREE.Vector3 instance');
+    }
+
+    const tkRAS_MNI305 = this.state_data.get('tkRAS_MNI305');
+    if( tkRAS_MNI305 && tkRAS_MNI305.isMatrix4 ){
+      // calculate MNI 305 position
+      vec.applyMatrix4(tkRAS_MNI305);
+    } else if( nan_if_trans_not_found ){
+      vec.set(NaN, NaN, NaN);
+    }
+    return(vec);
   }
 
   switch_surface( target_subject, surface_type = 'pial', opacity = [1, 1], material_type = ['normal', 'normal'] ){
@@ -65465,6 +64264,30 @@ mapped = false,
               // target_volume = this.group.get( `Volume (${target_subject})` ),
               hide_electrode = origin_position[0] === 0 && origin_position[1] === 0 && origin_position[2] === 0;
 
+        // Calculate MNI 305 coordinate in template space
+        if( el.userData.MNI305_position === undefined ){
+          el.userData.MNI305_position = new threeplugins_THREE.Vector3().set(0, 0, 0);
+          if(
+            Array.isArray( mni305 ) && mni305.length === 3 &&
+            !( mni305[0] === 0 && mni305[1] === 0 && mni305[2] === 0 )
+          ) {
+            el.userData.MNI305_position.fromArray( mni305 );
+          } else {
+            let v2v_orig = get_or_default( this.shared_data, origin_subject, {} ).vox2vox_MNI305;
+            if( v2v_orig ){
+              mat1.set( v2v_orig[0][0], v2v_orig[0][1], v2v_orig[0][2], v2v_orig[0][3],
+                                    v2v_orig[1][0], v2v_orig[1][1], v2v_orig[1][2], v2v_orig[1][3],
+                                    v2v_orig[2][0], v2v_orig[2][1], v2v_orig[2][2], v2v_orig[2][3],
+                                    v2v_orig[3][0], v2v_orig[3][1], v2v_orig[3][2], v2v_orig[3][3] );
+              pos_targ.fromArray( origin_position ).applyMatrix4(mat1);
+              el.userData.MNI305_position.fromArray( pos_targ.toArray() );
+            }
+
+          }
+        }
+
+        // mni305_points is always valid (if data is complete).
+        const mni305_points = el.userData.MNI305_position;
         pos_orig.fromArray( origin_position );
 
         let mapped = false,
@@ -65473,7 +64296,7 @@ mapped = false,
         // always do MNI305 mapping first as calibration
         if( !hide_electrode && volume === 'mni305' ){
           // apply MNI 305 transformation
-          const v2v_orig = get_or_default( this.shared_data, origin_subject, {} ).vox2vox_MNI305;
+          // let v2v_orig = get_or_default( this.shared_data, origin_subject, {} ).vox2vox_MNI305;
           const v2v_targ = get_or_default( this.shared_data, target_subject, {} ).vox2vox_MNI305;
 
           if( v2v_targ ){
@@ -65484,14 +64307,11 @@ mapped = false,
 
             mat2.getInverse( mat2 );
 
-            if( Array.isArray( mni305 ) && mni305.length === 3 && !(
-              // not origin
-              mni305[0] === 0 && mni305[1] === 0 && mni305[2] === 0
-            ) ){
-              pos_targ.fromArray( mni305 ).applyMatrix4(mat2);
+            if( mni305_points.x !== 0 || mni305_points.y !== 0 || mni305_points.z !== 0 ){
+              pos_targ.set( mni305_points.x, mni305_points.y, mni305_points.z ).applyMatrix4(mat2);
               mapped = true;
             }
-
+            /*
             if( !mapped && v2v_orig ){
               mat1.set( v2v_orig[0][0], v2v_orig[0][1], v2v_orig[0][2], v2v_orig[0][3],
                         v2v_orig[1][0], v2v_orig[1][1], v2v_orig[1][2], v2v_orig[1][3],
@@ -65501,9 +64321,10 @@ mapped = false,
               // target position = inv(mat2) * mat1 * origin_position
               // mat2.multiplyMatrices( mat2, mat1 );
               pos_targ.fromArray( origin_position ).applyMatrix4(mat1);
+
               pos_targ.applyMatrix4( mat2 );
               mapped = true;
-            }
+            }*/
 
             if( mapped ){
               el.position.copy( pos_targ );
@@ -65563,6 +64384,7 @@ mapped = false,
         if( hide_electrode ){
           el.visible = false;
         }
+
       }
     });
 
@@ -65802,7 +64624,6 @@ mapped = false,
 */
 
 // CONCATENATED MODULE: ./src/index.js
-/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "BrainCanvas", function() { return src_BrainCanvas; });
 /**
  * @Author: Zhengjia Wang
  * Adapter of model (threejs_scene) and viewer (htmlwidgets)
@@ -65911,12 +64732,16 @@ class src_BrainCanvas{
       // Do nothing! as the canvas is usually invisible
       return(null);
     }
-    console.debug( this.outputId + ' - Resize to ' + width + ' x ' + height );
+    // console.debug( this.outputId + ' - Resize to ' + width + ' x ' + height );
     this.el_side.style.maxHeight = height + 'px';
     if(this.hide_controls){
       this.canvas.handle_resize(width, height);
     }else{
       this.canvas.handle_resize(width - 300, height);
+    }
+    if( this._reset_flag ){
+      this._reset_flag = false;
+      this.canvas.reset_side_canvas();
     }
     this.canvas.start_animation(0);
   }
@@ -65989,20 +64814,24 @@ class src_BrainCanvas{
     }
 
     // ---------------------------- Presets
+    let _ani_control_registered = false;
     to_array( control_presets ).forEach((control_preset) => {
-      if( control_preset === 'animation' ){
-        return(null);
-      }
+
       try {
         presets['c_' + control_preset]();
+        if( control_preset === 'animation' ){
+          _ani_control_registered = true;
+        }
       } catch (e) {
         if(this.DEBUG){
           console.warn(e);
         }
       }
     });
+    if( !_ani_control_registered ){
+      presets.c_animation();
+    }
 
-    presets.c_animation();
 
     return(gui);
 
@@ -66071,13 +64900,15 @@ class src_BrainCanvas{
     to_array( this.settings.color_maps ).forEach((v) => {
       this.canvas.add_colormap(
         v.name,
+        v.alias,
         v.value_type,
         v.value_names,
         v.value_range,
         v.time_range,
         v.color_keys,
         v.color_vals,
-        v.color_levels
+        v.color_levels,
+        v.hard_range
       );
     });
 
@@ -66166,6 +64997,8 @@ class src_BrainCanvas{
 
       if( this.settings.side_display || false ){
         this.canvas.enable_side_cameras();
+        // reset so that the size is displayed correctly
+        this._reset_flag = true;
       }else{
         this.canvas.disable_side_cameras();
       }

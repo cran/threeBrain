@@ -20,6 +20,7 @@ freesurfer_brain2(
   volume_types = "t1",
   surface_types = "pial",
   curvature = "sulc",
+  ct_path = NULL,
   use_cache = TRUE,
   use_141 = getOption("threeBrain.use141", TRUE),
   ...
@@ -43,6 +44,8 @@ freesurfer_brain2(
 \item{surface_types}{surface types to load}
 
 \item{curvature}{curvature data. Only support \code{"sulc"} for current version}
+
+\item{ct_path}{an aligned CT file in 'Nifti' format}
 
 \item{...}{ignored}
 }
@@ -94,7 +97,7 @@ Currently, only linear `Talairach` transform matrix is supported (located at
 The 3D viewer in this package uses the center of volume as the origin (0, 0, 0).
 }
 \examples{
-\donttest{
+\dontrun{
 # Please run `download_N27()` if `N27` is not at '~/rave_data/others/three_brain/'
 
 # Import from `FreeSurfer` subject folder
