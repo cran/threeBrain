@@ -81,6 +81,18 @@ threejs_brain <- function(
       )
     }
   })
+  global_container$group$set_group_data(
+    name = '__global_data__FreeSurferColorLUT',
+    value = list(
+      'path' = system.file('FreeSurferColorLUT.json', package = 'threeBrain'),
+      'absolute_path' = system.file('FreeSurferColorLUT.json', package = 'threeBrain'),
+      'file_name' = 'FreeSurferColorLUT.json',
+      'is_new_cache' = FALSE,
+      'is_cache' = TRUE
+    ),
+    is_cached = TRUE,
+    cache_if_not_exists = FALSE
+  )
 
 
   # Create element list
@@ -315,21 +327,23 @@ save_brain <- function(widget, directory, filename = 'index.html', assetpath = '
   #   dependencies$
   # }
 
-  s <- c(
-    '#!/bin/bash',
-    'DIRECTORY=`dirname "$0"`',
-    'cd "$DIRECTORY"',
-    "Rscript -e '{if(system.file(\"\",package=\"servr\")==\"\"){install.packages(\"servr\",repos=\"https://cloud.r-project.org\")};servr::httd(browser=TRUE)}'"
-  )
-  sh_file <- file.path(directory, 'launch.sh')
-  writeLines(s, sh_file)
-  sh_file <- normalizePath(sh_file)
-  system(sprintf('chmod a+x "%s"', sh_file), wait = FALSE)
+  # s <- c(
+  #   '#!/bin/bash',
+  #   'DIRECTORY=`dirname "$0"`',
+  #   'cd "$DIRECTORY"',
+  #   "Rscript -e '{if(system.file(\"\",package=\"servr\")==\"\"){install.packages(\"servr\",repos=\"https://cloud.r-project.org\")};servr::httd(browser=TRUE)}'"
+  # )
 
-  sh_file <- file.path(directory, 'launch.command')
-  writeLines(s, sh_file)
-  sh_file <- normalizePath(sh_file)
-  system(sprintf('chmod a+x "%s"', sh_file), wait = FALSE)
+  # copy files from inst folder
+  cmd_folders <- system.file("commands/", package = "threeBrain")
+  fnames <- list.files(cmd_folders, all.files = FALSE, full.names = FALSE, recursive = FALSE)
+  for(f in fnames){
+    sh_file <- file.path(directory, f)
+    file.copy(file.path(cmd_folders, f), sh_file)
+    if(!(get_os() == "windows" || endsWith(f, "zip") || endsWith(f, "txt"))){
+      system(sprintf('chmod a+x "%s"', normalizePath(sh_file)), wait = FALSE)
+    }
+  }
 
   if(as_zip){
     wd <- getwd()
