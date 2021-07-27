@@ -1,3 +1,22 @@
+threeBrain 0.2.0
+=======
+
+## Changes
+
+* More efficient volume rendering with transparency
+* Added shader functions to surface instances, allowing color rendering from volume, electrodes, or vertices (major change)
+* Added color-map generator for surface and volume data
+* Added method to generate data cube (volume) from `MNI305` coordinates
+* Optimized loading procedure
+* Removed `crayon`, `base64enc`, `htmltools`, `pryr` from dependence
+
+### Improvements
+
+* Bumped `threejs` version to `v131dev`
+* Fixed surface transparency losing fragments issue
+* Added loaders to shiny applications to avoid performance issues on old computers
+* Fixed electrodes not selected on mouse click-down (on `Firefox`)
+
 threeBrain 0.1.9
 =======
 

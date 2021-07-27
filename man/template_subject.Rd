@@ -12,7 +12,7 @@
 download_template_subject(
   subject_code = "N27",
   url = "https://github.com/dipterix/threeBrain-sample/releases/download/1.0.0/N27.zip",
-  template_dir = getOption("threeBrain.template_dir", "~/rave_data/others/three_brain")
+  template_dir = default_template_directory()
 )
 
 download_N27(make_default = FALSE, ...)
@@ -20,10 +20,13 @@ download_N27(make_default = FALSE, ...)
 set_default_template(
   subject_code,
   view = TRUE,
-  template_dir = getOption("threeBrain.template_dir", "~/rave_data/others/three_brain")
+  template_dir = default_template_directory()
 )
 
-threebrain_finalize_installation(upgrade = c("ask", "always", "never"))
+threebrain_finalize_installation(
+  upgrade = c("ask", "always", "never"),
+  async = TRUE
+)
 }
 \arguments{
 \item{subject_code}{character with only letters and numbers (Important). Default is `N27`}
@@ -40,6 +43,8 @@ threebrain_finalize_installation(upgrade = c("ask", "always", "never"))
 
 \item{upgrade}{whether to check and download 'N27' brain interactively.
 Choices are 'ask', 'always', and 'never'}
+
+\item{async}{whether to run the job in parallel to others; default is true}
 }
 \description{
 Download and Manage Template Subjects

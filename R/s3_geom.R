@@ -53,25 +53,25 @@
 #' \dontrun{
 #'
 #' # download N27 brain
-#' # Make sure you have N27 brain downloaded to ~/rave_data/others/threeBrain/N27
+#' # Make sure you have N27 brain downloaded to `default_template_directory()`
 #' # download_N27()
 #'
-#' dat = threeBrain::read_fs_asc('~/rave_data/others/three_brain/N27/surf/lh.pial.asc')
+#' template_dir <- default_template_directory()
+#'
+#' dat = threeBrain::read_fs_asc(
+#'   file.path(template_dir, 'N27/surf/lh.pial.asc')
+#' )
 #' vertex = dat$vertices[,1:3]
 #' face = dat$faces[,1:3]
 #'
 #' # 1. dynamically serialize
 #' mesh = geom_freemesh('lh', vertex = vertex, face = face, layer = 1)
-#' pryr::object_size(mesh) # ~10 MB
-#' threejs_brain(mesh) # ~3 seconds to serialize
 #'
 #' # 2. cache
 #' # Create group, all geometries in this group are relatively positioned
 #' tmp_file = tempfile()
 #' mesh = geom_freemesh('Left Hemisphere cached', vertex = vertex,
 #'                      face = face, cache_file = tmp_file)
-#' pryr::object_size(mesh) # ~0.5 MB
-#' threejs_brain(mesh) # serialize at once, load in browser
 #'
 #' }
 #' @export
@@ -115,10 +115,10 @@ geom_sphere <- function(name, radius, position = c(0,0,0), layer=1, group = NULL
 #' However, it's always recommended to pass a group to the free mesh.
 #' @examples
 #' \dontrun{
-#' # Make sure you have N27 brain downloaded to ~/rave_data/others/threeBrain/N27
+#' # Make sure you have N27 brain downloaded to `default_template_directory()`
 #' # threeBrain::download_N27()
 #'
-#' n27_dir = '~/rave_data/others/three_brain/N27/'
+#' n27_dir = file.path(default_template_directory(), "N27")
 #' surf_type = 'pial'
 #'
 #' # Locate mesh files

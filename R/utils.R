@@ -22,8 +22,25 @@ stopifnot2 <- function(..., msg = 'Condition not satisfied'){
 }
 
 
-data_uri <- function(file, ...){
-  base64enc::dataURI(file = file, ...)
+# data_uri <- function(file, ...){
+#   base64enc::dataURI(file = file, ...)
+# }
+
+htmlDependency <- function (
+  name, version, src, meta = NULL, script = NULL, stylesheet = NULL,
+  head = NULL, attachment = NULL, package = NULL, all_files = TRUE) {
+
+  version <- as.character(version)
+  srcNames <- names(src)
+  if (is.null(srcNames)){ srcNames <- rep.int("", length(src)) }
+  srcNames[!nzchar(srcNames)] <- "file"
+  names(src) <- srcNames
+  src <- as.list(src)
+  structure(class = "html_dependency", list(
+    name = name, version = as.character(version),
+    src = src, meta = meta, script = script, stylesheet = stylesheet,
+    head = head, attachment = attachment, package = package,
+    all_files = all_files))
 }
 
 
@@ -40,6 +57,7 @@ cat2 <- function(
     'DEFAULT' = '#000000'
   )
 ){
+  level <- toupper(level)
   if(!level %in% names(pal)){
     level <- 'DEFAULT'
   }
@@ -49,18 +67,29 @@ cat2 <- function(
   }
 
   # check if interactive
-  if(base::interactive()){
-    # use colored console
-    col <- crayon::make_style(.col)
+  if(dipsaus::rs_avail() && !nzchar(file)){
     if(print_level){
       base::cat('[', level, ']: ', sep = '')
     }
 
-    base::cat(col(..., sep = sep), end = end, file = file, fill = fill, labels = labels, append = append)
+    # level to color prefix
+    prefix <- list(
+      "DEBUG" = "\033[38;5;246m",
+      'INFO' = '\033[38;5;35m',
+      'WARNING' = '\033[38;5;215m',
+      'ERROR' = '\033[38;5;203m',
+      'FATAL' = '\033[38;5;95m',
+      'DEFAULT' = '\033[38;5;232m'
+    )[[level]]
+    if(is.null(prefix)){
+      prefix <- '\033[38;5;232m'
+    }
+    s <- paste(..., sep = sep)
+    base::cat(prefix, s, "\033[39m", end, file = file, fill = fill, labels = labels, append = append, sep = '')
 
   }else{
     # Just use cat
-    base::cat(...)
+    base::cat(..., end, file = file, fill = fill, labels = labels, append = append)
   }
 
   if(level == 'FATAL'){
@@ -161,6 +190,11 @@ to_json <- function(x, dataframe = 'rows', matrix = 'rowmajor', null = 'null', n
     writeLines(s, con = to_file)
   }
   s
+}
+
+to_json2 <- function(...){
+  toJSON <- asNamespace('htmlwidgets')$toJSON
+  toJSON(...)
 }
 
 from_json <- function(txt, simplifyVector = TRUE, simplifyDataFrame = simplifyVector,
@@ -718,5 +752,100 @@ load_first_file <- function(files, fun, ..., if_not_found = NULL){
   f <- files[fe][[1]]
 
   fun(f, ...)
+
+}
+
+rand_string <- function(length = 50){
+  paste(sample(c(letters, LETTERS, 0:9), length, replace = TRUE), collapse = '')
+}
+
+R_user_dir <- function (package, which = c("data", "config", "cache")) {
+  stopifnot(is.character(package), length(package) == 1L)
+  which <- match.arg(which)
+  home <- normalizePath("~")
+  path <- switch(
+    which, data = {
+      p <- Sys.getenv("R_USER_DATA_DIR")
+      if (!nzchar(p)) {
+        p <- Sys.getenv("XDG_DATA_HOME")
+        if( !nzchar(p) ){
+          if( .Platform$OS.type == "windows" ){
+            p <- file.path(Sys.getenv("APPDATA"), "R", "data")
+          } else if (Sys.info()["sysname"] == "Darwin") {
+            p <- file.path(home, "Library", "Application Support", "org.R-project.R")
+          } else {
+            p <- file.path(home, ".local", "share" )
+          }
+        }
+      }
+      p
+  }, config = {
+    p <- Sys.getenv("R_USER_CONFIG_DIR")
+    if (!nzchar(p)) {
+      p <- Sys.getenv("R_USER_CONFIG_DIR")
+      if (!nzchar(p)) {
+        p <- Sys.getenv("XDG_CONFIG_HOME")
+        if (!nzchar(p)) {
+          if( .Platform$OS.type == "windows" ){
+            p <- file.path(Sys.getenv("APPDATA"), "R", "config")
+          } else if (Sys.info()["sysname"] == "Darwin") {
+            p <- file.path(home, "Library", "Preferences", "org.R-project.R")
+          } else {
+            p <- file.path(home, ".config")
+          }
+        }
+      }
+    }
+    p
+  }, cache = {
+    p <- Sys.getenv("R_USER_CACHE_DIR")
+    if (!nzchar(p)) {
+      p <- Sys.getenv("XDG_CACHE_HOME")
+      if (!nzchar(p)) {
+        if( .Platform$OS.type == "windows" ){
+          p <- file.path(Sys.getenv("LOCALAPPDATA"), "R", "cache")
+        } else if (Sys.info()["sysname"] == "Darwin") {
+          p <- file.path(home, "Library", "Caches", "org.R-project.R")
+        } else {
+          p <- file.path(home, ".cache")
+        }
+      }
+    }
+    p
+  })
+  file.path(path, "R", package)
+}
+
+#' @title Default Directory to Store Template Brain
+#' @return A directory path where template brain is stored at; see also
+#' \code{\link{download_N27}}
+#' @details When \code{threeBrain.template_dir} is not set or invalid, the
+#' function checks 'RAVE' (R Analysis and Visualization for 'iEEG',
+#' \url{https://openwetware.org/wiki/RAVE}) folder at home directory. If
+#' this folder is missing, then returns results from
+#' \code{R_user_dir('threeBrain', 'data')}. To override the default behavior,
+#' use \code{options(threeBrain.template_dir=...)}.
+#' @examples
+#'
+#' default_template_directory()
+#'
+#' @export
+default_template_directory <- function(){
+
+  re <- unname(getOption('threeBrain.template_dir', NULL), force = TRUE)
+  if(length(re) != 1 || !isTRUE(dir.exists(re))){
+    # If rave data dir exists, use rave directory
+    if(dir.exists('~/rave_data/others/three_brain')){
+      re <- '~/rave_data/others/three_brain'
+    } else {
+      re <- R_user_dir('threeBrain', 'data')
+      re <- file.path(re, 'templates')
+      if(!dir.exists(re)){
+        dir_create(re)
+      }
+    }
+  }
+
+  normalizePath(re, mustWork = FALSE)
 
 }
