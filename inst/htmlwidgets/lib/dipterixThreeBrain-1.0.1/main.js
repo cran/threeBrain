@@ -51735,7 +51735,7 @@ const WEBGL = {
 /* harmony export */ __webpack_require__.d(__webpack_exports__, {
 /* harmony export */   "t": () => (/* binding */ CONSTANTS)
 /* harmony export */ });
-/* harmony import */ var _threeplugins_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(178);
+/* harmony import */ var _threeplugins_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(1829);
 
 // Defined all the constants
 
@@ -51804,6 +51804,9 @@ CONSTANTS.KEY_MOVE_AXIAL              = "KeyQ";         // `w/⇧W` - move axial
 CONSTANTS.KEY_MOVE_SAGITTAL           = "KeyW";         // `e/⇧E` - move sagittal forward/backward
 CONSTANTS.KEY_CYCLE_ANIMATION         = "KeyC";         // `c` - cycle through animation clips or values
 CONSTANTS.KEY_TOGGLE_ANIMATION        = "KeyS";         // `s` - play/pause timer
+CONSTANTS.KEY_ADJUST_ELECTRODE_LOCATION_R = "Digit1";     // `1/⇧1` - adjust electrode locations along Right/Left axis
+CONSTANTS.KEY_ADJUST_ELECTRODE_LOCATION_A = "Digit2";     // `2/⇧2` - adjust electrode locations along Anterior/Posterior axis
+CONSTANTS.KEY_ADJUST_ELECTRODE_LOCATION_S = "Digit3";     // `3/⇧3` - adjust electrode locations along Superior/Inferior axis
 CONSTANTS.KEY_CYCLE_ELEC_EDITOR       = "Backquote";    // `` ` `` - cycle through electrodes (localization, experimental)
 CONSTANTS.KEY_CYCLE_SURFTYPE_EDITOR   = "Digit4";       // `4` - toggle electrode type (surface ot iEEG, experimental)
 CONSTANTS.KEY_NEW_ELECTRODE_EDITOR    = "Digit1";       // `1` - new electrode (experimental)
@@ -51873,7 +51876,8 @@ CONSTANTS.FOLDERS = {
   'electrode-style'       : 'Electrodes',
   'electrode-mapping'     : 'Electrodes',
   'animation'             : 'Data Visualization',
-  'highlight-selection'   : 'Data Visualization'
+  'highlight-selection'   : 'Data Visualization',
+  'localization'          : 'Electrode Localization'
 };
 
 CONSTANTS.THRESHOLD_OPERATORS = [
@@ -51901,20 +51905,2587 @@ CONSTANTS.RENDER_ORDER = {
 
 /***/ }),
 
-/***/ 1658:
+/***/ 6303:
 /***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
 
 "use strict";
 
 // EXPORTS
 __webpack_require__.d(__webpack_exports__, {
-  "E": () => (/* binding */ THREEBRAIN_CONTROL),
   "B": () => (/* binding */ THREEBRAIN_PRESETS)
 });
 
-// EXTERNAL MODULE: ./src/js/threeplugins.js + 5 modules
-var threeplugins = __webpack_require__(178);
-;// CONCATENATED MODULE: ./src/js/libs/dat.gui.module.js
+// EXTERNAL MODULE: ./src/js/utils.js
+var utils = __webpack_require__(3658);
+// EXTERNAL MODULE: ./src/js/constants.js
+var constants = __webpack_require__(975);
+;// CONCATENATED MODULE: ./src/js/controls/background.js
+
+
+
+// 1. Background colors
+
+function register_controls_background( THREEBRAIN_PRESETS ){
+
+  THREEBRAIN_PRESETS.prototype.c_background = function(){
+    const initial_bgcolor = this.settings.background || "#ffffff",
+          folder_name = constants/* CONSTANTS.FOLDERS.background-color */.t.FOLDERS["background-color"];
+
+    this.gui.add_item('Background Color', '#FFFFFF', {is_color : true, folder_name: folder_name})
+      .onChange((v) => {
+
+        // calculate inversed color for text
+        const inversedColor = (0,utils/* invertColor */.qd)(v);
+
+        this.canvas.background_color = v;
+        this.canvas.foreground_color = inversedColor;
+
+        // Set renderer background to be v
+        this.canvas.main_renderer.setClearColor(v);
+        this.canvas.side_renderer.setClearColor(v);
+
+        // this.el_text.style.color=inversedColor;
+        // this.el_text2.style.color=inversedColor;
+        // this.el.style.backgroundColor = v;
+        this.canvas.el.style.backgroundColor = v;
+
+        this.fire_change({ 'background' : v });
+
+        // force re-render
+        this._update_canvas(0);
+      })
+      .setValue( initial_bgcolor );
+
+  }
+
+  return( THREEBRAIN_PRESETS );
+
+}
+
+
+
+;// CONCATENATED MODULE: ./src/js/capture/CCFrameEncoder.js
+function CCFrameEncoder( settings ) {
+
+	var _handlers = {};
+
+	this.settings = settings;
+
+	this.on = function(event, handler) {
+
+		_handlers[event] = handler;
+
+	};
+
+	this.emit = function(event) {
+
+		var handler = _handlers[event];
+		if (handler) {
+
+			handler.apply(null, Array.prototype.slice.call(arguments, 1));
+
+		}
+
+	};
+
+	this.filename = settings.name || new Date().toGMTString();
+	this.extension = '';
+	this.mimeType = '';
+
+}
+
+CCFrameEncoder.prototype.start = function(){};
+CCFrameEncoder.prototype.stop = function(){};
+CCFrameEncoder.prototype.add = function(){};
+CCFrameEncoder.prototype.save = function(){};
+CCFrameEncoder.prototype.dispose = function(){};
+CCFrameEncoder.prototype.safeToProceed = function(){ return true; };
+CCFrameEncoder.prototype.step = function() {  };
+
+
+
+
+// EXTERNAL MODULE: ./src/js/download.js
+var download = __webpack_require__(3121);
+;// CONCATENATED MODULE: ./src/js/capture/CCanvasRecorder.js
+
+
+// import { ArrayBufferDataStream, BlobBuffer, WebMWriter } from './webm-writer-0.2.0.js';
+
+
+/*
+	WebM Encoder
+*/
+
+class CCanvasRecorder extends CCFrameEncoder{
+  constructor( settings ){
+    super( settings );
+  	this.extension = '.webm';
+  	this.mimeType = 'video/webm;codecs=vp8,opus';
+  	this.baseFilename = this.filename;
+    this.framerate = settings.framerate;
+  	this.chunks = [];
+
+  	this.canvas = settings.canvas;
+
+  	// Create stream object
+    this.stream = this.canvas.captureStream( this.framerate );
+
+    // create a recorder fed with our canvas' stream
+    this.recorder = new MediaRecorder(this.stream, {mimeType : 'video/webm;codecs=vp8,opus'});
+
+    // save the chunks
+    this.recorder.ondataavailable = (e) => {
+      this.chunks.push(e.data);
+    };
+
+    // On stop, save data
+    this.recorder.onstop = (e) => {
+      this.save((blob) => {
+        console.log('Start to download...');
+        (0,download/* download */.L)( blob, this.filename + this.extension );
+      });
+      this.chunks.length = 0;
+    };
+  }
+
+  stop(){
+    if(this.recorder && this.recorder.state === 'recording'){
+      this.recorder.stop();
+    }
+  }
+
+  start(){
+    this.dispose();
+    this.recorder.start();
+  }
+
+  save( callback = null ) {
+    if( !callback ){
+      return(null);
+    }
+
+    if( this.chunks.length > 0 ){
+      let result = new Blob(this.chunks);
+      callback( result );
+    }
+
+  }
+
+  dispose() {
+    if(this.recorder){
+      this.stop();
+    }
+    this.chunks.length = 0;
+  }
+
+  add() {
+    /*
+    // , addInfo = '', background = '#ffffff', foreground = '#000000'
+
+    // Add additional messages
+    if( addInfo && addInfo !== '' ){
+      // Add additional information
+      const font_size = this.ratio * 20;
+      this.context.font = `${font_size}px Georgia`;
+      this.context.fillStyle = foreground;
+      const ss = addInfo.split('\n');
+      for (let ii in ss ){
+        this.context.fillText(ss[ii], 10, 50 + 1.4 * font_size * ii);
+      }
+
+    }
+    */
+  }
+}
+
+
+// CCWebMEncoder.prototype = Object.create( CCFrameEncoder.prototype );
+
+
+
+;// CONCATENATED MODULE: ./src/js/controls/record.js
+
+
+
+// 2. Record Videos
+
+function register_controls_record( THREEBRAIN_PRESETS ){
+
+  THREEBRAIN_PRESETS.prototype.c_recorder = function(){
+    const folder_name = constants/* CONSTANTS.FOLDERS.video-recorder */.t.FOLDERS["video-recorder"];
+    this.gui.add_item('Record Video', false, {folder_name: folder_name })
+      .onChange((v) =>{
+
+        if(v){
+          // create capture object
+          if( !this.canvas.capturer ){
+            this.canvas.capturer = new CCanvasRecorder({
+              canvas: this.canvas.domElement,
+              // FPS = 15
+              framerate: 24,
+              // Capture as webm
+              format: 'webm',
+              // workersPath: 'lib/',
+              // verbose results?
+              verbose: true,
+              autoSaveTime : 0,
+              main_width: this.canvas.main_renderer.domElement.width,
+              main_height: this.canvas.main_renderer.domElement.height,
+              sidebar_width: 300,
+              pixel_ratio : this.canvas.main_renderer.domElement.width / this.canvas.main_renderer.domElement.clientWidth
+            });
+          }
+
+          this.canvas.capturer.baseFilename = this.canvas.capturer.filename = new Date().toGMTString();
+          this.canvas.capturer.start();
+          this.canvas.capturer_recording = true;
+          // Force render a frame
+          // Canvas might not render
+          // this.canvas.start_animation(0);
+        }else{
+          this.canvas.capturer_recording = false;
+          if(this.canvas.capturer){
+            this.canvas.capturer.stop();
+            this.canvas.capturer.save();
+            // this.canvas.capturer.incoming = false;
+          }
+        }
+
+
+      });
+
+    this.gui.add_item('Screenshot', () => {
+      /* const img = this.canvas.domElement.toDataURL('image/png');
+      const _d = new Date().toJSON();
+
+      download(img, `[rave-brain] ${_d}.png`, 'image/png'); */
+      const _d = new Date().toJSON();
+      const doc = this.canvas.mapToPDF();
+      doc.save(`[rave-brain] ${_d}.pdf`);
+    }, {folder_name: folder_name });
+
+  };
+
+  return( THREEBRAIN_PRESETS );
+
+}
+
+
+
+;// CONCATENATED MODULE: ./src/js/controls/camera.js
+
+
+
+// 3. Reset Camera
+// 4. Camera Position
+
+function register_controls_camera( THREEBRAIN_PRESETS ){
+
+  THREEBRAIN_PRESETS.prototype.c_reset_camera = function(){
+    const folder_name = constants/* CONSTANTS.FOLDERS.reset-main-camera */.t.FOLDERS["reset-main-camera"];
+    this.gui.add_item('Reset', () => {
+      // Center camera first.
+      this.canvas.handle_resize( undefined, undefined, false, true );
+      this.canvas.reset_controls();
+      this.canvas.controls.enabled = true;
+    }, {folder_name: folder_name});
+  };
+
+  THREEBRAIN_PRESETS.prototype.c_main_camera_position = function(){
+    const folder_name = constants/* CONSTANTS.FOLDERS.main-camera-position */.t.FOLDERS["main-camera-position"];
+    const camera_pos = this.gui.add_item('Camera Position', '[free rotate]', {
+      args : ['[free rotate]', '[lock]', 'right', 'left', 'anterior', 'posterior', 'superior', 'inferior'],
+      folder_name : folder_name
+    }).onChange((v) => {
+
+      if( v === '[lock]' ){
+        this.canvas.controls.enabled = false;
+        return( null );
+      }
+      this.canvas.controls.enabled = true;
+
+      switch (v) {
+        case 'right':
+          this.canvas.main_camera.position.set( 500, 0, 0 );
+          this.canvas.main_camera.up.set( 0, 0, 1 );
+          break;
+        case 'left':
+          this.canvas.main_camera.position.set( -500, 0, 0 );
+          this.canvas.main_camera.up.set( 0, 0, 1 );
+          break;
+        case 'anterior':
+          this.canvas.main_camera.position.set( 0, 500, 0 );
+          this.canvas.main_camera.up.set( 0, 0, 1 );
+          break;
+        case 'posterior':
+          this.canvas.main_camera.position.set( 0, -500, 0 );
+          this.canvas.main_camera.up.set( 0, 0, 1 );
+          break;
+        case 'superior':
+          this.canvas.main_camera.position.set( 0, 0, 500 );
+          this.canvas.main_camera.up.set( 0, 1, 0 );
+          break;
+        case 'inferior':
+          this.canvas.main_camera.position.set( 0, 0, -500 );
+          this.canvas.main_camera.up.set( 0, 1, 0 );
+          break;
+      }
+
+      camera_pos.__select.value = '[free rotate]';
+
+      this._update_canvas();
+    });
+    /**
+     * initialize camera position. This requires `__reset_flag` from Canvas
+     * If __reset_flag=false, this means we are in shiny_mode and the widget
+     * has already been loaded once
+     */
+
+    if( this.canvas.__reset_flag ){
+      const inital_camera_pos = new THREE.Vector3().fromArray(
+        this.settings.camera_pos
+      );
+      if (inital_camera_pos.length() > 0){
+        this.canvas.main_camera.position.set(
+          inital_camera_pos.x,
+          inital_camera_pos.y,
+          inital_camera_pos.z
+        ).normalize().multiplyScalar(500);
+        if( inital_camera_pos.x !== 0 || inital_camera_pos.y !== 0 ){
+          this.canvas.main_camera.up.set( 0, 0, 1 );
+        } else {
+          this.canvas.main_camera.up.set( 0, 1, 0 );
+        }
+      }
+    }
+
+    this._update_canvas();
+  }
+
+  return( THREEBRAIN_PRESETS );
+
+}
+
+
+
+;// CONCATENATED MODULE: ./src/js/controls/axis.js
+
+
+// 5. display axis anchor
+
+function register_controls_axis( THREEBRAIN_PRESETS ){
+
+  THREEBRAIN_PRESETS.prototype.c_toggle_anchor = function(){
+    const folder_name = constants/* CONSTANTS.FOLDERS.toggle-helpper */.t.FOLDERS["toggle-helpper"];
+    this.gui.add_item('Display Coordinates', false, { folder_name: folder_name })
+      .onChange((v) => {
+        this.canvas.set_cube_anchor_visibility(v);
+        this.fire_change();
+      });
+  };
+
+  return( THREEBRAIN_PRESETS );
+
+}
+
+
+
+;// CONCATENATED MODULE: ./src/js/controls/side_canvas.js
+
+
+
+// 6. toggle side panel
+// 7. reset side panel position
+// 8. coronal, axial, sagittal position (depth)
+// 9. Electrode visibility in side canvas
+
+function register_controls_side_canvas( THREEBRAIN_PRESETS ){
+
+  THREEBRAIN_PRESETS.prototype.c_toggle_side_panel = function(){
+    const folder_name = constants/* CONSTANTS.FOLDERS.toggle-side-panels */.t.FOLDERS["toggle-side-panels"];
+    const _v = this.settings.side_display || false;
+
+    const show_side = this.gui.add_item('Show Panels', _v, {folder_name: folder_name})
+      .onChange((v) => {
+        if( v ){
+          this.canvas.enable_side_cameras();
+        }else{
+          this.canvas.disable_side_cameras();
+        }
+        this.fire_change({ 'side_display' : v });
+      });
+
+
+    if( _v ){
+      this.canvas.enable_side_cameras();
+    }else{
+      this.canvas.disable_side_cameras();
+    }
+    this.fire_change({ 'side_display' : _v });
+
+  };
+
+  THREEBRAIN_PRESETS.prototype.c_reset_side_panel = function(){
+    const folder_name = constants/* CONSTANTS.FOLDERS.reset-side-panels */.t.FOLDERS["reset-side-panels"],
+          zoom_level = this.settings.side_canvas_zoom,
+          side_width = this.settings.side_canvas_width,
+          side_shift = this.settings.side_canvas_shift;
+    this.gui.add_item('Reset Position', () => {
+      this.canvas.reset_side_canvas( zoom_level, side_width, side_shift );
+    }, {folder_name: folder_name});
+
+    // reset first
+    this.canvas._side_width = side_width;
+    this.canvas.reset_side_canvas( zoom_level, side_width, side_shift );
+  }
+
+  THREEBRAIN_PRESETS.prototype.c_side_depth = function(){
+    const folder_name = constants/* CONSTANTS.FOLDERS.side-three-planes */.t.FOLDERS["side-three-planes"];
+
+    const _calculate_intersection_coord = () => {
+      console.debug('Recalculate MNI305 for plane intersections');
+      // MNI 305 position of the intersection
+      const ints_z = this.canvas.state_data.get( 'axial_posz' ) || 0,
+            ints_y = this.canvas.state_data.get( 'coronal_posy' ) || 0,
+            ints_x = this.canvas.state_data.get( 'sagittal_posx' ) || 0;
+      const point = new THREE.Vector3().set(ints_x, ints_y, ints_z);
+      this.canvas.calculate_mni305( point );
+      // set controller
+      _controller_mni305.setValue(`${point.x.toFixed(1)}, ${point.y.toFixed(1)}, ${point.z.toFixed(1)}`);
+    };
+    this._calculate_intersection_coord = _calculate_intersection_coord;
+
+    /*this.canvas.bind( 'c_side_depth_subject_changed', 'switch_subject', (e) => {
+		  _calculate_intersection_coord();
+		}, this.canvas.el);*/
+
+    // side plane
+    const _controller_coronal = this.gui
+      .add_item('Coronal (P - A)', 0, {folder_name: folder_name})
+      .min(-128).max(128).step(1).onChange((v) => {
+        this.canvas.set_coronal_depth( v );
+        this.fire_change({ 'coronal_depth' : v });
+        _calculate_intersection_coord();
+      });
+    this.gui.add_tooltip( constants/* CONSTANTS.TOOLTIPS.KEY_MOVE_CORONAL */.t.TOOLTIPS.KEY_MOVE_CORONAL, 'Coronal (P - A)', folder_name);
+
+    const _controller_axial = this.gui
+      .add_item('Axial (I - S)', 0, {folder_name: folder_name})
+      .min(-128).max(128).step(1).onChange((v) => {
+        this.canvas.set_axial_depth( v );
+        this.fire_change({ 'axial_depth' : v });
+        _calculate_intersection_coord();
+      });
+    this.gui.add_tooltip( constants/* CONSTANTS.TOOLTIPS.KEY_MOVE_AXIAL */.t.TOOLTIPS.KEY_MOVE_AXIAL, 'Axial (I - S)', folder_name);
+
+    const _controller_sagittal = this.gui
+      .add_item('Sagittal (L - R)', 0, {folder_name: folder_name})
+      .min(-128).max(128).step(1).onChange((v) => {
+        this.canvas.set_sagittal_depth( v );
+        this.fire_change({ 'sagittal_depth' : v });
+        _calculate_intersection_coord();
+      });
+    this.gui.add_tooltip( constants/* CONSTANTS.TOOLTIPS.KEY_MOVE_SAGITTAL */.t.TOOLTIPS.KEY_MOVE_SAGITTAL, 'Sagittal (L - R)', folder_name);
+
+    const _controller_mni305 = this.gui
+      .add_item('Intersect MNI305', "NaN, NaN, NaN", {folder_name: folder_name});
+
+    this.fire_change({ 'coronal_depth' : 0 });
+    this.fire_change({ 'axial_depth' : 0 });
+    this.fire_change({ 'sagittal_depth' : 0 });
+
+    [ _controller_coronal, _controller_axial, _controller_sagittal ].forEach((_c, ii) => {
+
+      this.canvas.bind( `dat_gui_side_controller_${ii}_mousewheel`, 'mousewheel',
+        (evt) => {
+          if( evt.altKey ){
+            evt.preventDefault();
+            const current_val = _c.getValue();
+            _c.setValue( current_val + evt.deltaY );
+          }
+        }, _c.domElement );
+
+    });
+
+    this.canvas.set_side_depth = (c, a, s) => {
+      if( typeof c === 'number' ){
+        _controller_coronal.setValue( c );
+      }
+      if( typeof a === 'number' ){
+        _controller_axial.setValue( a || 0 );
+      }
+      if( typeof s === 'number' ){
+        _controller_sagittal.setValue( s || 0 );
+      }
+    };
+
+    const overlay_coronal = this.gui.add_item('Overlay Coronal', false,
+      {folder_name: folder_name})
+      .onChange((v) => {
+        this.canvas.set_side_visibility('coronal', v);
+        this.fire_change({ 'coronal_visibility' : v });
+      });
+    this.gui.add_tooltip( constants/* CONSTANTS.TOOLTIPS.KEY_OVERLAY_CORONAL */.t.TOOLTIPS.KEY_OVERLAY_CORONAL, 'Overlay Coronal', folder_name);
+
+    const overlay_axial = this.gui.add_item('Overlay Axial', false,
+      {folder_name: folder_name})
+      .onChange((v) => {
+        this.canvas.set_side_visibility('axial', v);
+        this.fire_change({ 'axial_visibility' : v });
+      });
+    this.gui.add_tooltip( constants/* CONSTANTS.TOOLTIPS.KEY_OVERLAY_AXIAL */.t.TOOLTIPS.KEY_OVERLAY_AXIAL, 'Overlay Axial', folder_name);
+
+    const overlay_sagittal = this.gui.add_item('Overlay Sagittal', false,
+      {folder_name: folder_name})
+      .onChange((v) => {
+        this.canvas.set_side_visibility('sagittal', v);
+        this.fire_change({ 'sagittal_visibility' : v });
+      });
+    this.gui.add_tooltip( constants/* CONSTANTS.TOOLTIPS.KEY_OVERLAY_SAGITTAL */.t.TOOLTIPS.KEY_OVERLAY_SAGITTAL, 'Overlay Sagittal', folder_name);
+
+    this.fire_change({ 'coronal_visibility' : false });
+    this.fire_change({ 'axial_visibility' : false });
+    this.fire_change({ 'sagittal_visibility' : false });
+
+    // register overlay keyboard shortcuts
+    this.canvas.add_keyboard_callabck( constants/* CONSTANTS.KEY_OVERLAY_CORONAL */.t.KEY_OVERLAY_CORONAL, (evt) => {
+      if( (0,utils/* has_meta_keys */.xy)( evt.event, true, false, false ) ){
+        const _v = overlay_coronal.getValue();
+        overlay_coronal.setValue( !_v );
+      }
+    }, 'overlay_coronal');
+
+    this.canvas.add_keyboard_callabck( constants/* CONSTANTS.KEY_MOVE_CORONAL */.t.KEY_MOVE_CORONAL, (evt) => {
+      const _v = _controller_coronal.getValue();
+      if( (0,utils/* has_meta_keys */.xy)( evt.event, true, false, false ) ){
+        _controller_coronal.setValue( _v - 1 );
+      }else if( (0,utils/* has_meta_keys */.xy)( evt.event, false, false, false ) ){
+        _controller_coronal.setValue( _v + 1 );
+      }
+    }, 'move_coronal');
+
+
+    this.canvas.add_keyboard_callabck( constants/* CONSTANTS.KEY_OVERLAY_AXIAL */.t.KEY_OVERLAY_AXIAL, (evt) => {
+      if( (0,utils/* has_meta_keys */.xy)( evt.event, true, false, false ) ){
+        const _v = overlay_axial.getValue();
+        overlay_axial.setValue( !_v );
+      }
+    }, 'overlay_axial');
+
+    this.canvas.add_keyboard_callabck( constants/* CONSTANTS.KEY_MOVE_AXIAL */.t.KEY_MOVE_AXIAL, (evt) => {
+      const _v = _controller_axial.getValue();
+      if( (0,utils/* has_meta_keys */.xy)( evt.event, true, false, false ) ){
+        _controller_axial.setValue( _v - 1 );
+      }else if( (0,utils/* has_meta_keys */.xy)( evt.event, false, false, false ) ){
+        _controller_axial.setValue( _v + 1 );
+      }
+    }, 'move_axial');
+
+    this.canvas.add_keyboard_callabck( constants/* CONSTANTS.KEY_OVERLAY_SAGITTAL */.t.KEY_OVERLAY_SAGITTAL, (evt) => {
+      if( (0,utils/* has_meta_keys */.xy)( evt.event, true, false, false ) ){
+        const _v = overlay_sagittal.getValue();
+        overlay_sagittal.setValue( !_v );
+      }
+    }, 'overlay_sagittal');
+
+    this.canvas.add_keyboard_callabck( constants/* CONSTANTS.KEY_MOVE_SAGITTAL */.t.KEY_MOVE_SAGITTAL, (evt) => {
+      const _v = _controller_sagittal.getValue();
+      if( (0,utils/* has_meta_keys */.xy)( evt.event, true, false, false ) ){
+        _controller_sagittal.setValue( _v - 1 );
+      }else if( (0,utils/* has_meta_keys */.xy)( evt.event, false, false, false ) ){
+        _controller_sagittal.setValue( _v + 1 );
+      }
+    }, 'move_sagittal');
+  }
+
+  THREEBRAIN_PRESETS.prototype.c_side_electrode_dist = function(){
+    const folder_name = constants/* CONSTANTS.FOLDERS.side-electrode-dist */.t.FOLDERS["side-electrode-dist"];
+    // show electrodes trimmed
+    this.gui.add_item('Dist. Threshold', 2, { folder_name: folder_name })
+      .min(0).max(64).step(0.1)
+      .onChange((v) => {
+        this.canvas.trim_electrodes( v );
+        this._update_canvas();
+        this.fire_change();
+      });
+    this.canvas.trim_electrodes( 2 );
+  }
+
+  return( THREEBRAIN_PRESETS );
+
+}
+
+
+
+;// CONCATENATED MODULE: ./src/js/controls/subject.js
+
+
+// 10. subject code
+
+function register_controls_subject( THREEBRAIN_PRESETS ){
+
+  THREEBRAIN_PRESETS.prototype.c_subject2 = function(){
+    // Get subjects
+    const folder_name = constants/* CONSTANTS.FOLDERS.subject-selector */.t.FOLDERS["subject-selector"],
+          subject_ids = this.canvas.subject_codes;
+
+    if( subject_ids.length > 0 ){
+      let _s = this.canvas.state_data.get( 'target_subject' ) || subject_ids[0];
+      this.gui.add_item('Subject', _s, {
+        folder_name : folder_name,
+        args : subject_ids
+      }).onChange((v) => {
+        this.canvas.switch_subject( v );
+        this.fire_change();
+      });
+
+      this.canvas.switch_subject();
+    }else{
+      // controller center
+      this.canvas.update_control_center( this.settings.control_center );
+    }
+
+  }
+
+  return( THREEBRAIN_PRESETS );
+
+}
+
+
+
+;// CONCATENATED MODULE: ./src/js/controls/surface.js
+
+
+
+// 11. surface type
+// 12. Hemisphere material/transparency
+// surface color
+
+function register_controls_surface( THREEBRAIN_PRESETS ){
+
+  THREEBRAIN_PRESETS.prototype.get_surface_ctype = function(){
+    const _c = this.gui.get_controller( 'Surface Color' );
+    if( _c.isfake ){ return( "none" ); }
+    return( _c.getValue() );
+  }
+  THREEBRAIN_PRESETS.prototype.set_surface_ctype = function(
+    t, params = {}
+  ){
+
+    if( !this._surface_ctype_map ){ return; }
+    if (t === undefined){ return; }
+    let ctype = t,
+        sigma = params.sigma,
+        blend = params.blend,
+        decay = params.decay,
+        radius = params.radius;
+
+    if( t === true ){
+      // refresh
+      ctype = this._current_surface_ctype;
+    }
+    if( !ctype ){ ctype = "vertices"; }
+    this._current_surface_ctype = ctype;
+
+    let _c;
+    if( sigma === undefined ){
+      _c = this.gui.get_controller( 'Sigma' );
+      if( _c.isfake ){ sigma = 3.0; } else { sigma = _c.getValue(); }
+    }
+    if( blend === undefined ){
+      _c = this.gui.get_controller( 'Blend Factor' );
+      if( _c.isfake ){ blend = 0.4; } else { blend = _c.getValue(); }
+    }
+    if( decay === undefined ){
+      _c = this.gui.get_controller( 'Decay' );
+      if( _c.isfake ){ decay = 0.15; } else { decay = _c.getValue(); }
+    }
+    if( radius === undefined ){
+      _c = this.gui.get_controller( 'Range Limit' );
+      if( _c.isfake ){ radius = 10.0; } else { radius = _c.getValue(); }
+    }
+
+    let col_code = this._surface_ctype_map[ ctype ];
+    if( col_code === undefined ){
+      col_code = constants/* CONSTANTS.VERTEX_COLOR */.t.VERTEX_COLOR;
+      this._current_surface_ctype = "vertices";
+    }
+    let f = (el) => {
+      if( !(el.isFreeMesh && el._material_options) ){ return; }
+      el._material_options.which_map.value = col_code;
+      el._material_options.blend_factor.value = blend;
+      el._material_options.elec_decay.value = decay;
+      el._material_options.elec_radius.value = radius;
+
+      if( el.object.visible && col_code === constants/* CONSTANTS.VOXEL_COLOR */.t.VOXEL_COLOR ){
+        // need to get current active datacube2
+        const inst = this.current_voxel_type();
+        if( inst ){
+          el._set_color_from_datacube2(inst, sigma);
+        } else {
+          el._material_options.which_map.value = constants/* CONSTANTS.DEFAULT_COLOR */.t.DEFAULT_COLOR;
+        }
+      }
+    };
+
+
+    this.canvas.threebrain_instances.forEach( f );
+
+    this._update_canvas();
+    this.fire_change({ 'surface_color_type' : this._current_surface_ctype });
+
+  }
+
+  THREEBRAIN_PRESETS.prototype.c_surface_type2 = function(){
+
+    const folder_name = constants/* CONSTANTS.FOLDERS.surface-selector */.t.FOLDERS["surface-selector"],
+          _s = this.canvas.state_data.get( 'surface_type' ) || 'pial',
+          _c = this.canvas.get_surface_types(),
+          _mty = this.canvas.state_data.get( 'surface_material_type' ) || 'MeshPhongMaterial',
+          _mtyc = ['MeshPhongMaterial', 'MeshLambertMaterial'];
+
+    if( _c.length === 0 ){
+      return(null);
+    }
+    const surf_type = this.gui.add_item('Surface Type', _s, {args : _c, folder_name : folder_name })
+      .onChange((v) => {
+        this.canvas.switch_subject( '/', {
+          'surface_type': v
+        });
+        this.fire_change({ 'surface_type' : v });
+      });
+    this.fire_change({ 'surface_type' : _s });
+    this.gui.add_tooltip( constants/* CONSTANTS.TOOLTIPS.KEY_CYCLE_SURFACE */.t.TOOLTIPS.KEY_CYCLE_SURFACE, 'Surface Type', folder_name);
+
+    this.canvas.add_keyboard_callabck( constants/* CONSTANTS.KEY_CYCLE_SURFACE */.t.KEY_CYCLE_SURFACE, (evt) => {
+      if( (0,utils/* has_meta_keys */.xy)( evt.event, false, false, false ) ){
+        let current_idx = (_c.indexOf( surf_type.getValue() ) + 1) % _c.length;
+        if( current_idx >= 0 ){
+          surf_type.setValue( _c[ current_idx ] );
+        }
+      }
+    }, 'gui_surf_type2');
+
+
+    const surf_material = this.gui.add_item('Surface Material', _mty, {
+      args : _mtyc, folder_name : folder_name })
+      .onChange((v) => {
+        this.canvas.state_data.set( 'surface_material_type', v );
+        this.fire_change({ 'surface_material' : v });
+        this._update_canvas();
+      });
+    this.fire_change({ 'surface_material' : _mty });
+    this.gui.add_tooltip( constants/* CONSTANTS.TOOLTIPS.KEY_CYCLE_MATERIAL */.t.TOOLTIPS.KEY_CYCLE_MATERIAL, 'Surface Material', folder_name);
+
+
+    this.canvas.add_keyboard_callabck( constants/* CONSTANTS.KEY_CYCLE_MATERIAL */.t.KEY_CYCLE_MATERIAL, (evt) => {
+      if( (0,utils/* has_meta_keys */.xy)( evt.event, true, false, false ) ){
+        let current_idx = (_mtyc.indexOf( surf_material.getValue() ) + 1) % _mtyc.length;
+        if( current_idx >= 0 ){
+          surf_material.setValue( _mtyc[ current_idx ] );
+        }
+      }
+    }, 'gui_surf_material');
+
+
+  };
+
+  THREEBRAIN_PRESETS.prototype.c_hemisphere_material = function(){
+
+    const folder_name = constants/* CONSTANTS.FOLDERS.hemisphere-material */.t.FOLDERS["hemisphere-material"],
+          options = ['normal', 'wireframe', 'hidden'];
+
+    const lh_ctrl = this.gui.add_item('Left Hemisphere', 'normal',{ args : options, folder_name : folder_name })
+      .onChange((v) => {
+        this.canvas.switch_subject( '/', { 'material_type_left': v });
+        this.fire_change();
+      });
+    this.gui.add_tooltip( constants/* CONSTANTS.TOOLTIPS.KEY_CYCLE_LEFT */.t.TOOLTIPS.KEY_CYCLE_LEFT, 'Left Hemisphere', folder_name);
+
+    const rh_ctrl = this.gui.add_item('Right Hemisphere', 'normal',{ args : options, folder_name : folder_name })
+      .onChange((v) => {
+        this.canvas.switch_subject( '/', { 'material_type_right': v });
+        this.fire_change();
+      });
+    this.gui.add_tooltip( constants/* CONSTANTS.TOOLTIPS.KEY_CYCLE_RIGHT */.t.TOOLTIPS.KEY_CYCLE_RIGHT, 'Right Hemisphere', folder_name);
+
+    const lh_trans = this.gui.add_item('Left Opacity', 1.0, { folder_name : folder_name })
+    .min( 0.1 ).max( 1 ).step( 0.1 )
+      .onChange((v) => {
+        this.canvas.switch_subject( '/', { 'surface_opacity_left': v });
+        this.fire_change();
+      });
+    this.gui.add_tooltip( '⇧' + constants/* CONSTANTS.TOOLTIPS.KEY_CYCLE_LEFT */.t.TOOLTIPS.KEY_CYCLE_LEFT, 'Left Opacity', folder_name);
+
+    const rh_trans = this.gui.add_item('Right Opacity', 1.0, { folder_name : folder_name })
+    .min( 0.1 ).max( 1 ).step( 0.1 )
+      .onChange((v) => {
+        this.canvas.switch_subject( '/', { 'surface_opacity_right': v });
+        this.fire_change();
+      });
+    this.gui.add_tooltip( '⇧' + constants/* CONSTANTS.TOOLTIPS.KEY_CYCLE_RIGHT */.t.TOOLTIPS.KEY_CYCLE_RIGHT, 'Right Opacity', folder_name);
+
+    // add keyboard shortcut
+    this.canvas.add_keyboard_callabck( constants/* CONSTANTS.KEY_CYCLE_LEFT */.t.KEY_CYCLE_LEFT, (evt) => {
+      if( (0,utils/* has_meta_keys */.xy)( evt.event, true, false, false ) ){
+        let current_opacity = lh_trans.getValue() - 0.3;
+        if( current_opacity < 0 ){ current_opacity = 1; }
+        lh_trans.setValue( current_opacity );
+      }else if( (0,utils/* has_meta_keys */.xy)( evt.event, false, false, false ) ){
+        let current_idx = (options.indexOf( lh_ctrl.getValue() ) + 1) % options.length;
+        if( current_idx >= 0 ){
+          lh_ctrl.setValue( options[ current_idx ] );
+        }
+      }
+    }, 'gui_left_cycle');
+
+    this.canvas.add_keyboard_callabck( constants/* CONSTANTS.KEY_CYCLE_RIGHT */.t.KEY_CYCLE_RIGHT, (evt) => {
+      if( (0,utils/* has_meta_keys */.xy)( evt.event, true, false, false ) ){
+        let current_opacity = rh_trans.getValue() - 0.3;
+        if( current_opacity < 0 ){ current_opacity = 1; }
+        rh_trans.setValue( current_opacity );
+      }else if( (0,utils/* has_meta_keys */.xy)( evt.event, false, false, false ) ){
+        let current_idx = (options.indexOf( rh_ctrl.getValue() ) + 1) % options.length;
+        if( current_idx >= 0 ){
+          rh_ctrl.setValue( options[ current_idx ] );
+        }
+      }
+    }, 'gui_right_cycle');
+  };
+
+  THREEBRAIN_PRESETS.prototype.c_surface_color = function(){
+    const folder_name = constants/* CONSTANTS.FOLDERS.surface-selector */.t.FOLDERS["surface-selector"],
+          maps = {
+            'vertices' : constants/* CONSTANTS.VERTEX_COLOR */.t.VERTEX_COLOR,
+            'sync from voxels' : constants/* CONSTANTS.VOXEL_COLOR */.t.VOXEL_COLOR,
+            'sync from electrodes' : constants/* CONSTANTS.ELECTRODE_COLOR */.t.ELECTRODE_COLOR,
+            'none' : constants/* CONSTANTS.DEFAULT_COLOR */.t.DEFAULT_COLOR
+          },
+          options = Object.keys( maps );
+    this._surface_ctype_map = maps;
+    let col = 'vertices';
+
+    this.gui.add_item('Surface Color', col, {args : options, folder_name : folder_name })
+      .onChange((v) => {
+        this.gui.hide_item(['Blend Factor', 'Sigma', 'Decay', 'Range Limit'], folder_name);
+        const last_ctype = this._current_surface_ctype;
+        this.canvas.__hide_voxels = false;
+        this.set_surface_ctype( v );
+
+        if( this._current_surface_ctype !== "none" ){
+          this.gui.show_item(['Blend Factor'], folder_name);
+        }
+
+        if( this._current_surface_ctype === "sync from voxels" ){
+          this.gui.show_item(['Sigma'], folder_name);
+          this.canvas.__hide_voxels = true;
+        } else {
+          if( last_ctype === "sync from voxels" ) {
+            // leaving, have to set voxels to none
+            this.canvas.__hide_voxels = true;
+          }
+          if( this._current_surface_ctype === "sync from electrodes" ){
+            this.gui.show_item(['Decay', 'Range Limit'], folder_name);
+          }
+        }
+        this._update_canvas();
+      });
+
+    this.canvas.add_keyboard_callabck( constants/* CONSTANTS.KEY_CYCLE_SURFACE_COLOR */.t.KEY_CYCLE_SURFACE_COLOR, (evt) => {
+      if( (0,utils/* has_meta_keys */.xy)( evt.event, false, false, false ) ){
+        // options
+        const _c = this.gui.get_controller( "Surface Color" );
+
+        let current_idx = (options.indexOf( _c.getValue() ) + 1) % options.length;
+        if( current_idx >= 0 ){
+          _c.setValue( options[ current_idx ] );
+        }
+      }
+    }, 'gui_surf_color_type');
+    this.gui.add_tooltip( constants/* CONSTANTS.TOOLTIPS.KEY_CYCLE_SURFACE_COLOR */.t.TOOLTIPS.KEY_CYCLE_SURFACE_COLOR, 'Surface Color', folder_name);
+
+    const blend_factor = this.gui.add_item(
+      "Blend Factor", 0.4, { folder_name : folder_name })
+      .min( 0 ).max( 1 )
+      .onChange((v) => {
+        if( typeof(v) != "number" ){
+          v = 0.4;
+        } else if( v < 0 ){
+          v = 0;
+        } else if (v > 1){
+          v = 1;
+        }
+        this.set_surface_ctype( true, { 'blend' : v } );
+        this._update_canvas();
+      })
+
+    // ---------- for voxel-color ---------------
+
+    const map_delta = this.gui.add_item("Sigma", 3.0, { folder_name : folder_name })
+      .min( 0 ).max( 10 )
+      .onChange((v) => {
+        if( v !== undefined ){
+          if( v < 0 ){ v = 0; }
+          this.set_surface_ctype( true, { 'sigma' : v } );
+          this._update_canvas();
+        }
+      });
+
+    // ---------- for electrode maps ------------
+    this.gui.add_item("Decay", 0.15, { folder_name : folder_name })
+      .min( 0.05 ).max( 1 ).step( 0.05 )
+      .onChange((v) => {
+        if( v !== undefined ){
+          if( v < 0.05 ){ v = 0.05; }
+          this.set_surface_ctype( true, { 'decay' : v } );
+          this._update_canvas();
+        }
+      });
+
+    this.gui.add_item("Range Limit", 10.0, { folder_name : folder_name })
+      .min( 1.0 ).max( 30.0 ).step( 1.0 )
+      .onChange((v) => {
+        if( v !== undefined ){
+          if( v < 1.0 ){ v = 1.0; }
+          this.set_surface_ctype( true, { 'radius' : v } );
+          this._update_canvas();
+        }
+      });
+
+    // 'elec_decay'        : { value : 2.0 },
+    // 'blend_factor'      : { value : 0.4 }
+
+
+    this.gui.hide_item(['Blend Factor', 'Sigma', 'Decay', 'Range Limit'], folder_name);
+  };
+
+  return( THREEBRAIN_PRESETS );
+
+}
+
+
+
+// EXTERNAL MODULE: ./src/js/geometry/sphere.js
+var sphere = __webpack_require__(960);
+;// CONCATENATED MODULE: ./src/js/controls/electrodes.js
+
+
+
+
+// 13. electrode visibility, highlight, groups
+// 14. electrode mapping
+// 16. Highlight selected electrodes and info
+
+function register_controls_electrodes( THREEBRAIN_PRESETS ){
+
+  THREEBRAIN_PRESETS.prototype.set_electrodes_visibility = function( v ){
+    if( !this._controller_electrodes ){
+      return(false);
+    }
+    if( this._ani_status ){
+      this._ani_status.setValue( false );
+    }
+
+    // render electrode colors by subjects
+    this.canvas.subject_codes.forEach((subject_code, ii) => {
+      (0,utils/* to_array */.AA)( this.canvas.electrodes.get( subject_code ) ).forEach((e) => {
+        this._electrode_visibility( e , ii , v );
+      });
+    });
+    this.canvas.state_data.set('electrode_visibility', v);
+
+    this._update_canvas();
+    this.fire_change({ 'electrode_visibility' : v });
+    return(true);
+  };
+
+  THREEBRAIN_PRESETS.prototype.c_electrodes = function(){
+    const folder_name = constants/* CONSTANTS.FOLDERS.electrode-style */.t.FOLDERS["electrode-style"];
+    const show_inactives = this.settings.show_inactive_electrodes;
+    const vis_types = ['all visible', 'hide inactives', 'hidden'];
+    const initial_value = show_inactives? 'all visible': 'hide inactives';
+
+    this.canvas.state_data.set('electrode_visibility', initial_value);
+
+    // please check if el is electrode before dumpping into this function
+    this._electrode_visibility = (el, ii, v) => {
+      if( !(0,sphere/* is_electrode */.OK)( el ) ){
+        return(null);
+      }
+      switch (v) {
+        case 'hidden':
+          // el is invisible
+          el.visible = false;
+          break;
+        case 'hide inactives':
+          if( el.material.isMeshLambertMaterial ){
+            el.visible = false;
+          }else{
+            el.visible = true;
+          }
+          break;
+        default:
+          el.visible = true;
+      }
+    };
+
+
+    this._controller_electrodes = this.gui.add_item('Visibility', initial_value,
+      {args : vis_types, folder_name : folder_name })
+      .onChange((v) => {
+        this.set_electrodes_visibility( v );
+        this.fire_change();
+      });
+    this.gui.add_tooltip( constants/* CONSTANTS.TOOLTIPS.KEY_CYCLE_ELEC_VISIBILITY */.t.TOOLTIPS.KEY_CYCLE_ELEC_VISIBILITY, 'Visibility', folder_name);
+
+    // Add shortcuts
+    this.canvas.add_keyboard_callabck( constants/* CONSTANTS.KEY_CYCLE_ELEC_VISIBILITY */.t.KEY_CYCLE_ELEC_VISIBILITY, (evt) => {
+      if( (0,utils/* has_meta_keys */.xy)( evt.event, false, false, false ) ){
+        let current_idx = (vis_types.indexOf( this._controller_electrodes.getValue() ) + 1) % vis_types.length;
+        if( current_idx >= 0 ){
+          this._controller_electrodes.setValue( vis_types[ current_idx ] );
+        }
+      }
+    }, 'gui_c_electrodes');
+
+  };
+
+  THREEBRAIN_PRESETS.prototype.c_map_template = function(){
+    const folder_name = constants/* CONSTANTS.FOLDERS.electrode-mapping */.t.FOLDERS["electrode-mapping"];
+    const subject_codes = ['[no mapping]', ...this.canvas.subject_codes];
+
+    const do_mapping = this.gui.add_item('Map Electrodes', false, { folder_name : folder_name })
+      .onChange((v) => {
+        this.canvas.switch_subject( '/', { 'map_template': v });
+        if( v ){
+          this.gui.show_item(['Surface Mapping', 'Volume Mapping'], folder_name);
+        } else {
+          this.gui.hide_item(['Surface Mapping', 'Volume Mapping'], folder_name);
+        }
+        this.fire_change();
+      });
+
+    this.gui.add_item('Surface Mapping', 'std.141', {
+      args : ['std.141', 'mni305', 'no mapping'],
+      folder_name : folder_name })
+      .onChange((v) => {
+        this.canvas.switch_subject( '/', { 'map_type_surface': v });
+        this.fire_change();
+      });
+
+    this.gui.add_item('Volume Mapping', 'mni305', {
+      args : ['mni305', 'no mapping'],
+      folder_name : folder_name })
+      .onChange((v) => {
+        this.canvas.switch_subject( '/', { 'map_type_volume': v });
+        this.fire_change();
+      });
+
+    // hide mapping options
+    this.gui.hide_item(['Surface Mapping', 'Volume Mapping'], folder_name);
+
+    // need to check if this is multiple subject case
+    if( this.canvas.shared_data.get(".multiple_subjects") ){
+      // Do mapping by default
+      do_mapping.setValue( true );
+      // and open gui
+      this.gui.open_folder( folder_name );
+    }
+
+  };
+
+  THREEBRAIN_PRESETS.prototype.c_display_highlights = function(){
+    const folder_name = constants/* CONSTANTS.FOLDERS.highlight-selection */.t.FOLDERS["highlight-selection"] || 'Data Visualization';
+    this.gui.add_item('Highlight Box', true, { folder_name : folder_name })
+      .onChange((v) => {
+        this.canvas.state_data.set( 'highlight_disabled', !v );
+        this.canvas.focus_object( this.canvas.object_chosen );
+        this.fire_change();
+        this._update_canvas(0);
+      });
+
+    this.gui.add_item('Info Text', true, { folder_name : folder_name })
+      .onChange((v) => {
+        this.canvas.state_data.set( 'info_text_disabled', !v );
+        this.fire_change();
+        this._update_canvas(0);
+      });
+  };
+
+  return( THREEBRAIN_PRESETS );
+
+}
+
+
+
+;// CONCATENATED MODULE: ./src/js/controls/animation.js
+
+
+
+// 15. animation, play/pause, speed, clips...
+
+function register_controls_animation( THREEBRAIN_PRESETS ){
+
+  THREEBRAIN_PRESETS.prototype.set_animation_time = function(v){
+    if(this._ani_time){
+      if(typeof(v) !== 'number'){
+        v = this.animation_time[0];
+      }
+      this.__current_time = v;
+      this._ani_time.setValue( v );
+    }
+  };
+
+  THREEBRAIN_PRESETS.prototype.get_animation_params = function(){
+    if(this._ani_time && this._ani_speed && this._ani_status){
+      return({
+        play : this._ani_status.getValue(),
+        time : this.__current_time || 0, //this._ani_time.getValue(),
+        speed : this._ani_speed.getValue(),
+        min : this.animation_time[0],
+        max : this.animation_time[1],
+        display : this._ani_name.getValue(),
+        threshold : this._thres_name.getValue()
+      });
+    }else{
+      return({
+        play : false,
+        time : 0,
+        speed : 0,
+        min : 0,
+        max : 0,
+        display : '[None]',
+        threshold : '[None]'
+      });
+    }
+  };
+
+  THREEBRAIN_PRESETS.prototype.add_clip = function(
+    clip_name, focus_ui = false
+  ){
+    if( (typeof clip_name !== 'string') || this._animation_names.includes(clip_name) ){ return; }
+    if( !this._ani_name || !this._thres_name ){ return; }
+    let el = document.createElement('option');
+    el.setAttribute('value', clip_name);
+    el.innerHTML = clip_name;
+    this._ani_name.__select.appendChild( el );
+
+    el = document.createElement('option');
+    el.setAttribute('value', clip_name);
+    el.innerHTML = clip_name;
+    this._thres_name.__select.appendChild( el );
+    this._animation_names.push( clip_name );
+
+    if( focus_ui ){
+      // This needs to be done in the next round (after dom op)
+      setTimeout(() => { this._ani_name.setValue( clip_name ); }, 100);
+    }
+
+  }
+
+  THREEBRAIN_PRESETS.prototype.c_animation = function(){
+
+    // Check if animation is needed
+    if( (0,utils/* to_array */.AA)( this.settings.color_maps ).length === 0 ){
+      return(false);
+    }
+
+    // Animation is needed
+    const step = 0.001,
+          folder_name = constants/* CONSTANTS.FOLDERS.animation */.t.FOLDERS.animation;
+
+    let cnames = Object.keys( this.settings.color_maps ),
+        names = ['[None]'],
+        initial = this.settings.default_colormap;
+
+    // Make sure the initial value exists, and [None] is included in the option
+    cnames.forEach(n => {
+      if( n === 'Subject' && cnames.includes('[Subject]') ){
+        return;
+      }
+      names.push( n );
+    });
+    this._animation_names = names;
+
+    if( !initial || !names.includes( initial ) || initial.startsWith('[') ){
+      initial = undefined;
+      names.forEach((_n) => {
+        if( !initial && !_n.startsWith('[') ){
+          initial = _n;
+        }
+      });
+    }
+
+    if( !initial ){
+      initial = '[None]';
+    }
+
+
+    // Link functions to canvas (this is legacy code and I don't want to change it unless we rewrite the animation code)
+    this.canvas.animation_controls.set_time = ( v ) => {
+      this.set_animation_time( v );
+    };
+    this.canvas.animation_controls.get_params = () => { return( this.get_animation_params() ); };
+
+    // Defines when clip name is changed (variable changed)
+    const _ani_name_onchange = (v) => {
+      // Generate animations
+      this.canvas.generate_animation_clips( v, true, (cmap) => {
+
+        // update time_range
+        if( this.canvas.__min_t === undefined ) {
+          this.canvas.update_time_range();
+        }
+        this._ani_time.min( this.canvas.__min_t ).max( this.canvas.__max_t );
+        this.animation_time[0] = this.canvas.__min_t;
+        this.animation_time[1] = this.canvas.__max_t;
+
+        if( !cmap ){
+          legend_visible.setValue(false);
+          if( v === '[None]' ){
+            this.canvas.electrodes.forEach((_d) => {
+              for( let _kk in _d ){
+                _d[ _kk ].visible = true;
+              }
+            });
+          }
+        }else{
+          this.set_animation_time( this.animation_time[0] );
+          legend_visible.setValue(true);
+
+          // If inactive electrodes are hidden, re-calculate visibility
+          if( this._controller_electrodes ){
+            this.set_electrodes_visibility( this._controller_electrodes.getValue() );
+          }
+          // reset color-range
+          if( cmap.value_type === 'continuous' ){
+
+            val_range.setValue( this.__display_range_continuous || '' );
+
+            /*
+             val_range.setValue(
+               `${cmap.lut.minV.toPrecision(5)},${cmap.lut.maxV.toPrecision(5)}`
+             );
+            */
+            this.gui.show_item(['Display Range'], folder_name);
+          }else{
+            val_range.setValue(',');
+            this.gui.hide_item(['Display Range'], folder_name);
+          }
+
+        }
+        this._update_canvas();
+      });
+      this.canvas.state_data.set('display_variable', v);
+      this.fire_change({ 'clip_name' : v, 'display_data' : v });
+    };
+
+    const _thres_name_onchange = (v) => {
+      const cmap = this.canvas.color_maps.get(v);
+      if(!cmap){
+        // this is not a value we can refer to
+        thres_range.setValue('');
+        this.canvas.state_data.set('threshold_active', false);
+        return;
+      }
+
+      const previous_type = this.canvas.state_data.get('threshold_type');
+      const previous_value = this.canvas.state_data.get('threshold_type');
+
+      // set flags to canvas
+      this.canvas.state_data.set('threshold_active', true);
+      this.canvas.state_data.set('threshold_variable', v);
+
+      if(cmap.value_type === 'continuous'){
+        this.canvas.state_data.set('threshold_type', 'continuous');
+        this.gui.show_item('Threshold Method');
+
+        if( previous_type !== 'continuous' ){
+          thres_range.setValue( this.__threshold_values_continuous || '' );
+        }
+
+      }else{
+        // '' means no threshold
+        this.canvas.state_data.set('threshold_type', 'discrete');
+        thres_range.setValue(cmap.value_names.join('|'));
+        this.gui.hide_item('Threshold Method');
+      }
+    };
+
+    const ani_name = this.gui.add_item('Display Data', initial, { folder_name : folder_name, args : names })
+      .onChange((v) => {
+        _ani_name_onchange( v );
+        this.fire_change();
+        this._update_canvas();
+      });
+    this.gui.add_tooltip( constants/* CONSTANTS.TOOLTIPS.KEY_CYCLE_ANIMATION */.t.TOOLTIPS.KEY_CYCLE_ANIMATION, 'Display Data', folder_name);
+
+    this._ani_name = ani_name;
+    const val_range = this.gui.add_item('Display Range', '', { folder_name : folder_name })
+      .onChange((v) => {
+        let ss = v;
+        v = v.split(',').map(x => {
+          return( parseFloat(x) );
+        }).filter(x => {
+          return( !isNaN(x) );
+        });
+
+
+        if( v.length > 0 && !(v.length === 1 && v[0] === 0) ){
+          let v1 = v[0], v2 = Math.abs(v[0]);
+          if( v.length == 1 ){
+            v1 = -v2;
+          }else{
+            v2 = v[1];
+          }
+
+          // Set cmap value range
+          this.__display_range_continuous = ss;
+          this.canvas.switch_colormap( undefined, [v1, v2] );
+          // reset animation tracks
+
+        } else {
+          const cmap = this.canvas.switch_colormap();
+          if( cmap && cmap.value_type === 'continuous' ){
+            this.__display_range_continuous = '';
+            this.canvas.switch_colormap( undefined, [
+              cmap.value_range[0],
+              cmap.value_range[1]
+            ] );
+          }
+
+        }
+        /*
+        if( v.match(/[^0-9,-.eE~]/) ){
+          // illegal chars
+          ss = Array.from(v).map((s) => {
+            return( '0123456789.,-eE~'.indexOf(s) === -1 ? '' : s );
+          }).join('');
+        }
+        let vr = ss.split(/[,~]/);
+        if( vr.length === 2 ){
+          vr[0] = parseFloat( vr[0] );
+          vr[1] = parseFloat( vr[1] );
+        }
+
+        if( !isNaN( vr[0] ) && !isNaN( vr[1] ) ){
+          // Set cmap value range
+          this.canvas.switch_colormap( undefined, vr );
+          // reset animation tracks
+          this.canvas.generate_animation_clips( ani_name.getValue() , true );
+        }
+        */
+        this.canvas.generate_animation_clips( ani_name.getValue() , true );
+        this.fire_change();
+        this._update_canvas();
+
+      });
+
+    const thres_name = this.gui.add_item('Threshold Data', '[None]', { folder_name : folder_name, args : names })
+      .onChange((v) => {
+        _thres_name_onchange( v );
+        this.fire_change();
+        this._update_canvas();
+      });
+    this._thres_name = thres_name;
+
+    const thres_range = this.gui.add_item('Threshold Range', '', { folder_name : folder_name })
+      .onChange((v) => {
+        const is_continuous = (0,utils/* get_or_default */.jM)(this.canvas.state_data, 'threshold_type', 'discrete') == 'continuous';
+        let candidates = v.split(/[\|,]/).map((x) => { return(x.trim()); });
+
+        if(is_continuous){
+          candidates = candidates.map(x => { return(parseFloat(x)); })
+                                 .filter(x => { return(!isNaN(x)); });
+          /*
+          candidates = candidates.map((x) => {
+            let s = Array.from(x).map((s) => {
+              return( '0123456789.,-eE~'.indexOf(s) === -1 ? '' : s );
+            }).join('').split(/[,~]/);
+            if( s.length === 2 ){
+              s[0] = parseFloat( s[0] );
+              s[1] = parseFloat( s[1] );
+            }else{
+              return([]);
+            }
+            if( isNaN( s[0] ) || isNaN( s[1] ) ){
+              return([]);
+            }
+            return(s);
+          });
+          */
+          this.__threshold_values_continuous = v;
+        }
+        // set flag
+
+        this.canvas.state_data.set('threshold_values', candidates);
+        this.fire_change();
+        this._update_canvas();
+      });
+
+    const thres_method = this.gui.add_item('Threshold Method', '|v| >= T1', { folder_name : folder_name, args : constants/* CONSTANTS.THRESHOLD_OPERATORS */.t.THRESHOLD_OPERATORS })
+      .onChange((v) => {
+        const is_continuous = (0,utils/* get_or_default */.jM)(this.canvas.state_data, 'threshold_type', 'discrete') == 'continuous';
+        if( is_continuous ){
+          const op = constants/* CONSTANTS.THRESHOLD_OPERATORS.indexOf */.t.THRESHOLD_OPERATORS.indexOf(v);
+          if( op > -1 ){
+            this.canvas.state_data.set('threshold_method', op);
+            this.fire_change();
+            this._update_canvas();
+          }
+        }else{
+          // TODO: handle discrete data
+        }
+      });
+    this.canvas.state_data.set('threshold_method', 2);
+
+    this._ani_status = this.gui.add_item( 'Play/Pause', false,
+                                          { folder_name : folder_name },
+                                          constants/* CONSTANTS.TOOLTIPS.KEY_TOGGLE_ANIMATION */.t.TOOLTIPS.KEY_TOGGLE_ANIMATION );
+    this.gui.add_tooltip( constants/* CONSTANTS.TOOLTIPS.KEY_TOGGLE_ANIMATION */.t.TOOLTIPS.KEY_TOGGLE_ANIMATION, 'Play/Pause', folder_name);
+
+    this._ani_status.onChange((v) => { if(v){ this._update_canvas(2); }else{ this._update_canvas(-2); } });
+
+    this._ani_speed = this.gui.add_item('Speed', 1, {
+      args : { 'x 0.01' : 0.01, 'x 0.05' : 0.05, 'x 0.1' : 0.1, 'x 0.2': 0.2, 'x 0.5': 0.5, 'x 1': 1, 'x 2':2, 'x 5':5},
+      folder_name : folder_name
+    });
+
+    this.gui.add_item( 'Time', this.animation_time[0], { folder_name : folder_name })
+        .min(this.animation_time[0]).max(this.animation_time[1]).step(step).onChange((v) => {
+          if(typeof this.__current_time !== 'number' ||
+             Math.abs(this.__current_time - v) >= 0.001){
+            this.__current_time = v;
+          }
+          this._update_canvas();
+        });
+    this._ani_time = this.gui.get_controller('Time', folder_name);
+
+    this.canvas.bind( `dat_gui_ani_time_mousewheel`, 'mousewheel',
+      (evt) => {
+        if( evt.altKey ){
+          evt.preventDefault();
+          const current_val = this._ani_time.getValue();
+          this._ani_time.setValue( current_val + Math.sign( evt.deltaY ) * step );
+        }
+      }, this._ani_time.domElement );
+
+    // Add keyboard shortcut
+    this.canvas.add_keyboard_callabck( constants/* CONSTANTS.KEY_TOGGLE_ANIMATION */.t.KEY_TOGGLE_ANIMATION, (evt) => {
+      if( (0,utils/* has_meta_keys */.xy)( evt.event, false, false, false ) ){
+        const is_playing = this._ani_status.getValue();
+        this._ani_status.setValue( !is_playing );
+      }
+    }, 'gui_toggle_animation');
+
+    this.canvas.add_keyboard_callabck( constants/* CONSTANTS.KEY_CYCLE_ANIMATION */.t.KEY_CYCLE_ANIMATION, (evt) => {
+      if( (0,utils/* has_meta_keys */.xy)( evt.event, false, false, false ) ){
+        let current_idx = (names.indexOf( ani_name.getValue() ) + 1) % names.length;
+        if( current_idx >= 0 ){
+          ani_name.setValue( names[ current_idx ] );
+        }
+      }
+    }, 'gui_cycle_animation');
+
+
+    let render_legend = this.settings.show_legend;
+    const legend_visible = this.gui.add_item('Show Legend', true, {folder_name: folder_name })
+      .onChange((v) => {
+        this.canvas.render_legend = v;
+        this._update_canvas(0);
+        this.fire_change();
+      });
+
+    let render_timestamp = this.settings.render_timestamp || false;
+    const timestamp_visible = this.gui.add_item('Show Time', render_timestamp, {folder_name: folder_name })
+      .onChange((v) => {
+        this.canvas.render_timestamp = v;
+        this.fire_change({ 'render_timestamp' : v });
+        this._update_canvas(0);
+      });
+
+
+    this.canvas.render_legend = render_legend;
+    this.canvas.render_timestamp = render_timestamp;
+
+    this.fire_change({ 'render_timestamp' : render_timestamp });
+
+    _ani_name_onchange( initial );
+
+    this.gui.open_folder( folder_name );
+
+  }
+
+  return( THREEBRAIN_PRESETS );
+
+}
+
+
+
+;// CONCATENATED MODULE: ./src/js/controls/voxels.js
+
+
+
+
+// 17. Voxel color type
+
+function register_controls_voxels( THREEBRAIN_PRESETS ){
+
+  THREEBRAIN_PRESETS.prototype.update_voxel_type = function(){
+    let c, v, flag;
+
+    if( this._ctl_voxel_type_options ){
+      c = this.gui.get_controller("Voxel Type");
+      if( !c.isfake ){
+
+        let atlases = this.canvas.get_atlas_types();
+        atlases.push("none");
+        if( this._ctl_voxel_type_options.length !== atlases.length ){
+          flag = true;
+        } else {
+          flag = false;
+          this._ctl_voxel_type_options.forEach((v, ii) => {
+            if( atlases[ii] !== v ){
+              flag = true;
+            }
+          })
+        }
+        if( flag ){
+          flag = this.gui.alter_item("Voxel Type", atlases, () => {
+            this._ctl_voxel_type_options = atlases;
+          })
+        }
+      }
+    }
+  };
+
+  THREEBRAIN_PRESETS.prototype.current_voxel_type = function(){
+    const atlas_type = this.canvas.state_data.get("atlas_type") || "none",
+          sub = this.canvas.state_data.get("target_subject") || "none",
+          inst = this.canvas.threebrain_instances.get(`Atlas - ${atlas_type} (${sub})`);
+    if( inst && inst.isDataCube2 ){
+      return( inst );
+    }
+    return;
+  };
+
+  THREEBRAIN_PRESETS.prototype.c_voxel = function(){
+    const folder_name = constants/* CONSTANTS.FOLDERS.atlas */.t.FOLDERS.atlas || 'Volume Settings',
+          lut = this.canvas.global_data('__global_data__.VolumeColorLUT'),
+          lut_map = lut.map,
+          lut_alpha = lut.mapAlpha,
+          lut_type = lut.mapDataType;
+          // _atype = this.canvas.state_data.get( 'atlas_type' ) || 'none';  //_s
+    this._ctl_voxel_type_options = ['none'];
+    this._ctl_voxel_type_callback = (v) => {
+      if( v ){
+        if( this._current_surface_ctype !== "sync from voxels" ){
+          this.canvas.__hide_voxels = false;
+        }
+        this.canvas.switch_subject( '/', {
+          'atlas_type': v
+        });
+        this.fire_change({ 'atlas_type' : v });
+      }
+    }
+
+    this.gui.add_item('Voxel Type', 'none', {args : ['none'], folder_name : folder_name })
+      .onChange( this._ctl_voxel_type_callback );
+
+    this.fire_change({ 'atlas_type' : 'none', 'atlas_enabled' : false});
+    this.gui.add_tooltip( constants/* CONSTANTS.TOOLTIPS.KEY_CYCLE_ATLAS */.t.TOOLTIPS.KEY_CYCLE_ATLAS, 'Voxel Type', folder_name);
+
+    // register key callbacks
+    this.canvas.add_keyboard_callabck( constants/* CONSTANTS.KEY_CYCLE_ATLAS */.t.KEY_CYCLE_ATLAS, (evt) => {
+      if( (0,utils/* has_meta_keys */.xy)( evt.event, false, false, false ) ){
+        // have to update dynamically because it could change
+        const ctl = this.gui.get_controller("Voxel Type");
+        const _c = this._ctl_voxel_type_options;
+        let current_idx = (_c.indexOf( ctl.getValue() ) + 1) % _c.length;
+        if( current_idx >= 0 ){
+          ctl.setValue( _c[ current_idx ] );
+        }
+      }
+    }, 'gui_atlas_type');
+
+    // If color map supports alpha, add override option
+    const atlas_alpha = this.gui.add_item('Voxel Opacity', 0.0, { folder_name : folder_name })
+      .min(0).max(1).step(0.01)
+      .onChange((v) => {
+        const inst = this.current_voxel_type(),
+              opa = v < 0.001 ? -1 : v;
+        // mesh.material.uniforms.alpha.value = opa;
+        if( inst && inst.isDataCube2 ){
+          inst.object.material.uniforms.alpha.value = opa;
+          if( opa < 0 ){
+            inst._set_palette();
+            inst.object.material.uniforms.cmap.value.needsUpdate = true;
+          }
+        }
+        this._update_canvas();
+        this.fire_change({ 'atlas_alpha' : opa });
+      });
+
+    // this.gui.hide_item("Voxel Opacity")
+
+    //.add_item('Intersect MNI305', "NaN, NaN, NaN", {folder_name: folder_name});
+    if( lut_type === "continuous" ){
+
+      const cmap_array = Object.values(lut_map);
+      const voxel_value_range = (0,utils/* to_array */.AA)( lut.mapValueRange );
+      const voxel_minmax = (l, u) => {
+        const inst = this.current_voxel_type();
+        if( inst && inst.isDataCube2 ){
+
+          // might be large?
+          new Promise( () => {
+
+            let tmp;
+            const candidates = cmap_array.filter((e) => {
+              tmp = parseFloat(e.Label);
+              if(isNaN(tmp)){ return(false); }
+              if( tmp >= l && tmp <= u ){ return(true); }
+              return(false);
+            }).map( (e) => {
+              return(e.ColorID);
+            });
+
+            inst._set_palette( candidates );
+
+            inst.object.material.uniforms.cmap.value.needsUpdate = true;
+            this._update_canvas();
+          });
+
+        }
+      }
+      if(cmap_array.length > 0){
+        let vmin = voxel_value_range[0],
+            vmax = voxel_value_range[1];
+        this.gui.add_item('Voxel Min', vmin, { folder_name : folder_name })
+          .min(vmin).max(vmax).step((vmax - vmin) / cmap_array.length)
+          .onChange((v) => {
+            vmin = v;
+            voxel_minmax(vmin, vmax);
+          });
+
+        this.gui.add_item('Voxel Max', vmax, { folder_name : folder_name })
+          .min(vmin).max(vmax).step((vmax - vmin) / cmap_array.length)
+          .onChange((v) => {
+            vmax = v;
+            voxel_minmax(vmin, vmax);
+          });
+      }
+
+    } else {
+      const atlas_thred_text = this.gui.add_item('Voxel Label', "0", { folder_name : folder_name })
+      .onChange((v) => {
+
+        if(typeof(v) !== "string"){ return; }
+
+        const inst = this.current_voxel_type();
+        if( inst && inst.isDataCube2 ){
+
+          // might be large?
+          new Promise( () => {
+            const candidates = v.split(",")
+              .map((v) => {return parseInt(v)})
+              .filter((v) => {return !isNaN(v)});
+            inst._set_palette( candidates );
+            inst.object.material.uniforms.cmap.value.needsUpdate = true;
+            this._update_canvas();
+          });
+
+        }
+
+
+      });
+    }
+  };
+
+  return( THREEBRAIN_PRESETS );
+
+}
+
+
+
+// EXTERNAL MODULE: ./src/js/threeplugins.js + 6 modules
+var threeplugins = __webpack_require__(1829);
+;// CONCATENATED MODULE: ./src/js/Math/raycast_volume.js
+
+
+function raycast_volume_geneator(){
+
+  const orig = new threeplugins/* THREE.Vector3 */.J.Vector3().copy(origin);
+  const projection = new threeplugins/* THREE.Matrix3 */.J.Matrix3();
+  const p = new threeplugins/* THREE.Vector3 */.J.Vector3();
+  const p1 = new threeplugins/* THREE.Vector3 */.J.Vector3();
+  const f = new threeplugins/* THREE.Vector3 */.J.Vector3();
+
+  /*window.orig = orig;
+  window.projection = projection;
+  window.p = p;
+  window.p1 = p1;
+  window.f = f;*/
+
+  const raycast_volume = (
+    origin, direction, margin_voxels, margin_lengths,
+    map_array, delta = 2 ) => {
+    // canvas.mouse_raycaster.ray.origin
+    // canvas.mouse_raycaster.ray.direction
+
+    orig.x = origin.x + ( margin_lengths.x - 1 ) / 2;
+    orig.y = origin.y + ( margin_lengths.y - 1 ) / 2;
+    orig.z = origin.z + ( margin_lengths.z - 1 ) / 2;
+    f.x = margin_lengths.x / margin_voxels.x;
+    f.y = margin_lengths.y / margin_voxels.y;
+    f.z = margin_lengths.z / margin_voxels.z;
+    projection.set(
+      1-direction.x * direction.x,
+      -direction.x * direction.y,
+      -direction.x * direction.z,
+
+       -direction.y * direction.x,
+       1-direction.y * direction.y,
+       -direction.y * direction.z,
+
+       -direction.z * direction.x,
+       -direction.z * direction.y,
+       1-direction.z * direction.z
+    );
+    const a13 = projection.elements[2],
+          a23 = projection.elements[5],
+          a33 = projection.elements[8];
+    let i, j, k1, k2, tmp, k, dist = Infinity;
+    const mx = margin_voxels.x,
+          my = margin_voxels.y,
+          mz = margin_voxels.z;
+
+
+    const res = [NaN, NaN, NaN, NaN, NaN, NaN, NaN];
+
+    for( let i = 0; i < margin_voxels.x; i++ ){
+      for( let j = 0; j < margin_voxels.y; j++ ){
+        p.set( i * f.x - orig.x, j * f.y - orig.y , 0 );
+        p1.copy( p );
+        p.applyMatrix3( projection );
+        p.set(
+          p.x*p.x + p.y*p.y + p.z*p.z - delta,
+          p.x*a13 + p.y*a23 + p.z*a33,
+          a13*a13 + a23*a23 + a33*a33
+        );
+        p1.z = -p.y / p.z;
+        tmp = p1.applyMatrix3( projection ).length();
+        // check if it's truly close
+        if( tmp < delta ){
+
+          tmp = Math.sqrt( p.y * p.y - p.x * p.z ) / p.z;
+
+          if( !isNaN(tmp) ){
+
+            k1 = Math.ceil(((-p.y / p.z - tmp) + orig.z) / f.z);
+            k2 = Math.floor(((-p.y / p.z + tmp) + orig.z) / f.z);
+
+            if( k1 < 0 ){ k1 = 0; }
+            if( k2 >= mz ){ k2 = mz - 1 ; }
+
+            for( k = k1; k <= k2; k++ ){
+              tmp = map_array[(
+                i + j * mx + k * mx * my
+              ) * 4 + 3 ];
+              if( tmp > 0 ){
+                p.set(
+                  i * f.x - orig.x,
+                  j * f.y - orig.y,
+                  k * f.z - orig.z
+                );
+                tmp = p.dot( direction );
+                if( tmp < dist ){
+                  res[0] = i;
+                  res[1] = j;
+                  res[2] = k;
+                  res[3] = i * f.x - ( margin_lengths.x - 1 ) / 2;
+                  res[4] = j * f.y - ( margin_lengths.y - 1 ) / 2;
+                  res[5] = k * f.z - ( margin_lengths.z - 1 ) / 2;
+                  res[6] = tmp;
+                  dist = tmp;
+                }
+              }
+            }
+          }
+        }
+
+      }
+    }
+
+    return( res );
+  };
+
+  return( raycast_volume );
+};
+
+
+
+
+// EXTERNAL MODULE: ./node_modules/downloadjs/download.js
+var downloadjs_download = __webpack_require__(3729);
+;// CONCATENATED MODULE: ./src/js/controls/localization.js
+
+
+
+
+
+
+
+// Electrode localization
+const pos = new threeplugins/* THREE.Vector3 */.J.Vector3();
+const folder_name = constants/* CONSTANTS.FOLDERS.localization */.t.FOLDERS.localization || 'Electrode Localization';
+
+const raycast_volume = raycast_volume_geneator();
+
+const COL_SELECTED = 0xff0000,
+      COL_ENABLED = 0xfa9349,
+      COL_DISABLED = 0xf1f2d5;
+
+class TextTexture extends threeplugins/* THREE.Texture */.J.Texture {
+
+  constructor( text, mapping, wrapS, wrapT, magFilter, minFilter, format,
+    type, anisotropy, font = "Courier", size = 32
+  ) {
+
+    const canvas = document.createElement("canvas");
+    super( canvas, mapping, wrapS, wrapT, magFilter, minFilter, format, type, anisotropy );
+
+    this._text = text || " ";
+    this._size = Math.ceil( size );
+    this._canvas = canvas;
+    this._canvas.height = this._size;
+    this._canvas.width = Math.ceil( this._text.length * this._size * 0.6 );
+    this._context = this._canvas.getContext("2d");
+    this._context.font = `${this._size}px ${font}`;
+    this._context.fillText( this._text, 0, this._size * 26 / 32);
+
+		this.needsUpdate = true;
+
+	}
+
+}
+
+function add_electrode(scode, num, pos, canvas){
+  const group_name = `group_Electrodes (${scode})`;
+
+  let ac_pos = canvas.state_data.get("anterior_commissure");
+  if( ac_pos && ac_pos.isVector3 ){
+    ac_pos = ac_pos.x;
+  } else {
+    ac_pos = 0;
+  }
+
+  const el = canvas.add_object({
+    "name": `${scode}, ${num} - NEW_ELECTRODE`,
+    "type": "sphere",
+    "time_stamp": [],
+    "position": pos.toArray(),
+    "value": null,
+    "clickable": true,
+    "layer": 0,
+    "group":{
+      "group_name": group_name,
+      "group_layer": 0,
+      "group_position":[0,0,0]
+    },
+    "use_cache":false,
+    "custom_info": "",
+    "subject_code": scode,
+    "radius": 1.5,
+    "width_segments": 10,
+    "height_segments": 6,
+    "is_electrode":true,
+    "is_surface_electrode": false,
+    "use_template":false,
+    "surface_type": 'pial',
+    "hemisphere": pos.x > ac_pos ? "right" : "left",
+    "vertex_number": -1,
+    "sub_cortical": true,
+    "search_geoms": null
+  });
+  el._enabled = true;
+  el.object.material.color.set( COL_ENABLED );
+
+  const map = new TextTexture( `${num}` );
+  const material = new threeplugins/* THREE.SpriteMaterial */.J.SpriteMaterial( {
+    map: map,
+    depthTest : false,
+    depthWrite : false
+  } );
+  const sprite = new threeplugins/* THREE.Sprite */.J.Sprite( material );
+  sprite.scale.set(2,2,2);
+  el.object.add( sprite );
+
+  return( el );
+}
+
+function electrode_from_ct( inst, canvas ){
+  // const inst = this.current_voxel_type();
+  if( !inst ){ return; }
+  canvas.set_raycaster();
+  const res = raycast_volume(
+    canvas.mouse_raycaster.ray.origin,
+    canvas.mouse_raycaster.ray.direction,
+    new threeplugins/* THREE.Vector3 */.J.Vector3().fromArray( inst._cube_dim ),
+    new threeplugins/* THREE.Vector3 */.J.Vector3().set(
+      inst._margin_length.xLength,
+      inst._margin_length.yLength,
+      inst._margin_length.zLength,
+    ),
+    inst._color_texture.image.data,
+    2
+  );
+  pos.x = res[3];
+  pos.y = res[4];
+  pos.z = res[5];
+
+  return ( pos );
+}
+
+function electrode_from_slice( scode, canvas ){
+  if( !canvas._has_datacube_registered ){ return; }
+  const l = canvas.volumes.get(scode);
+  const k = Object.keys(l);
+  if( !k.length ) { return; }
+  const planes = l[k[0]];
+  if(!Array.isArray(planes) || planes.length != 3){ return; }
+
+  canvas.set_raycaster();
+  canvas.mouse_raycaster.layers.set( constants/* CONSTANTS.LAYER_SYS_MAIN_CAMERA_8 */.t.LAYER_SYS_MAIN_CAMERA_8 );
+
+  const items = canvas.mouse_raycaster.intersectObjects( planes );
+
+  if( !items.length ){ return; }
+
+  const p = items[0].point;
+  pos.copy( p );
+  return( pos );
+}
+
+function electrode_line_from_ct( inst, canvas, electrodes, size ){
+  if( !inst ){ return; }
+  if( electrodes.length < 2 ){ return; }
+  if( size <= 2 ){ return; }
+  const margin_nvoxels = new threeplugins/* THREE.Vector3 */.J.Vector3().fromArray( inst._cube_dim );
+  const margin_lengths = new threeplugins/* THREE.Vector3 */.J.Vector3().set(
+    inst._margin_length.xLength,
+    inst._margin_length.yLength,
+    inst._margin_length.zLength
+  );
+  const src = canvas.main_camera.position;
+  const dst = new threeplugins/* THREE.Vector3 */.J.Vector3();
+  electrodes[electrodes.length - 2].object.getWorldPosition( dst );
+
+  const n = size - 1;
+  const step = new threeplugins/* THREE.Vector3 */.J.Vector3();
+  electrodes[electrodes.length - 1].object.getWorldPosition( step );
+  step.sub( dst ).multiplyScalar( 1 / n );
+  const tmp = new threeplugins/* THREE.Vector3 */.J.Vector3();
+  const est = new threeplugins/* THREE.Vector3 */.J.Vector3();
+
+  const dir = new threeplugins/* THREE.Vector3 */.J.Vector3();
+  let res;
+  const re = [];
+  for( let ii = 1; ii < n; ii++ ){
+
+    tmp.copy( step ).multiplyScalar( ii );
+    est.copy( dst ).add( tmp );
+    dir.copy( est ).sub( src ).normalize();
+
+    for( let delta = 2; delta < 100; delta += 2 ){
+      res = raycast_volume(
+        src, dir, margin_nvoxels, margin_lengths,
+        inst._color_texture.image.data,
+        delta
+      );
+      if( res && res.length >= 6 && !isNaN( res[3] )){
+        let est1 = new threeplugins/* THREE.Vector3 */.J.Vector3( res[3], res[4], res[5] );
+        if( est1.distanceTo(est) < 10 + delta / 10 ){
+          re.push(est1);
+          break;
+        }
+      }
+    }
+  }
+
+  return( re );
+}
+window.electrode_line_from_ct = electrode_line_from_ct;
+
+function electrode_line_from_slice( canvas, electrodes, size ){
+  if( electrodes.length < 2 ){ return; }
+  if( size <= 2 ){ return; }
+
+  const src = canvas.main_camera.position;
+  const dst = new threeplugins/* THREE.Vector3 */.J.Vector3();
+
+  canvas.set_raycaster();
+  canvas.mouse_raycaster.layers.set( constants/* CONSTANTS.LAYER_SYS_MAIN_CAMERA_8 */.t.LAYER_SYS_MAIN_CAMERA_8 );
+  electrodes[electrodes.length - 2].object.getWorldPosition( dst );
+
+  const n = size - 1;
+  const step = new threeplugins/* THREE.Vector3 */.J.Vector3();
+  electrodes[electrodes.length - 1].object.getWorldPosition( step );
+  step.sub( dst ).multiplyScalar( 1 / n );
+  const tmp = new threeplugins/* THREE.Vector3 */.J.Vector3();
+  const est = new threeplugins/* THREE.Vector3 */.J.Vector3();
+
+  let res;
+  const re = [];
+
+  for( let ii = 1; ii < n; ii++ ){
+
+    tmp.copy( step ).multiplyScalar( ii );
+    est.copy( dst ).add( tmp );
+
+    re.push( new threeplugins/* THREE.Vector3 */.J.Vector3().copy(est) );
+  }
+
+  return( re );
+}
+window.electrode_line_from_slice = electrode_line_from_slice;
+
+function register_controls_localization( THREEBRAIN_PRESETS ){
+
+
+  THREEBRAIN_PRESETS.prototype.c_localization = function(){
+
+    const electrodes = [];
+    let refine_electrode;
+    window.electrodes = electrodes;
+
+    const edit_mode = this.gui.add_item( 'Edit Mode', "disabled", {
+      folder_name: folder_name,
+      args: ['disabled', 'CT/volume', 'MRI slice', 'refine']
+    }).onChange((v) => {
+
+      if( !v ){ return; }
+      if( refine_electrode && refine_electrode.isThreeBrainObject &&
+          (0,sphere/* is_electrode */.OK)( refine_electrode.object )){
+        if( refine_electrode._enabled ){
+          refine_electrode.object.material.color.set( COL_ENABLED );
+        } else {
+          refine_electrode.object.material.color.set( COL_DISABLED );
+        }
+
+        refine_electrode = null;
+      }
+      this.gui.hide_item([
+        ' - tkrRAS', ' - MNI305', ' - T1 RAS', 'Interpolate Size',
+        'Interpolate from Recently Added',
+        'Auto-Adjust Highlighted', 'Auto-Adjust All'
+      ], folder_name);
+      if( v === 'disabled' ){ return; }
+      if( v === 'refine' ) {
+        this.gui.show_item([
+          ' - tkrRAS', ' - MNI305', ' - T1 RAS',
+          'Auto-Adjust Highlighted', 'Auto-Adjust All'
+        ], folder_name);
+      } else {
+        this.gui.show_item([
+          ' - tkrRAS', ' - MNI305', ' - T1 RAS',
+          'Interpolate Size', 'Interpolate from Recently Added'
+        ], folder_name);
+      }
+
+      this._update_canvas();
+
+    });
+
+    // remove electrode
+    this.gui.add_item( 'Enable/Disable Electrode', () => {
+      if( refine_electrode &&
+          refine_electrode.isThreeBrainObject &&
+          (0,sphere/* is_electrode */.OK)( refine_electrode.object ) ){
+        if( refine_electrode._enabled ){
+          refine_electrode._enabled = false;
+          refine_electrode.object.material.color.set( COL_DISABLED );
+          refine_electrode = null;
+        } else {
+          refine_electrode.object._enabled = true;
+          refine_electrode.object.material.color.set( COL_ENABLED );
+          refine_electrode = null;
+        }
+
+        this._update_canvas();
+      }
+    },  { folder_name: folder_name });
+
+    this.gui.add_item( 'Auto-Adjust Highlighted', () => {
+      if( refine_electrode &&
+          refine_electrode.isThreeBrainObject &&
+          (0,sphere/* is_electrode */.OK)( refine_electrode.object ) ){
+        adjust_local( [ refine_electrode ] );
+        this._update_canvas();
+      }
+    },  { folder_name: folder_name });
+
+    this.gui.add_item( 'Auto-Adjust All', () => {
+      adjust_local( electrodes );
+      this._update_canvas();
+    },  { folder_name: folder_name });
+
+
+
+    // Calculate RAS
+    const tkr_loc = this.gui.add_item( ' - tkrRAS', "", {
+      folder_name: folder_name
+    });
+    const mni_loc = this.gui.add_item( ' - MNI305', "", {
+      folder_name: folder_name
+    });
+    const t1_loc = this.gui.add_item( ' - T1 RAS', "", {
+      folder_name: folder_name
+    });
+
+    // interpolate
+    const interpolate_size = this.gui.add_item( 'Interpolate Size', 1, {
+      folder_name: folder_name
+    }).min(1).step(1);
+
+    this.gui.add_item(
+      'Interpolate from Recently Added',
+      () => {
+        let v = Math.round( interpolate_size.getValue() );
+        if( !v ){ return; }
+        const mode = edit_mode.getValue();
+        const scode = this.canvas.state_data.get("target_subject");
+        if( !mode || mode == "disabled" ||
+            mode == "refine" ||
+            !scode || scode === ""
+        ){ return; }
+
+        if( electrodes.length < 2 ){
+          alert("Please localize at least 2 electrodes first.");
+          return;
+        }
+
+        let res;
+
+        if( mode == "CT/volume" ){
+          const inst = this.current_voxel_type();
+          res = electrode_line_from_ct( inst, this.canvas, electrodes, v + 2 );
+        } else {
+          res = electrode_line_from_slice( this.canvas, electrodes, v + 2 );
+        }
+
+        if( res.length ){
+          res.forEach((pos) => {
+            const el = add_electrode(
+              scode, electrodes.length + 1, pos, this.canvas
+            );
+            el._mode = mode;
+            electrodes.push( el );
+          });
+
+          this.canvas.switch_subject();
+        }
+
+      },
+      { folder_name: folder_name }
+    );
+
+
+    // Download as CSV
+    this.gui.add_item( 'Download as csv', () => {
+      this.canvas.download_electrodes("csv");
+    }, {
+      folder_name: folder_name
+    });
+
+
+
+    const adjust_local = (el_list) => {
+      // el is a threebrain instance
+      // inst is the CT
+      if( !el_list || !el_list.length ){ return; }
+      const els = el_list.filter((el) => { return( el && el._mode === "CT/volume" ); });
+      if( !els.length ){ return; }
+      const inst = this.current_voxel_type();
+      if( !inst ){ return; }
+
+      const margin_voxels = new threeplugins/* THREE.Vector3 */.J.Vector3().fromArray( inst._cube_dim );
+      const margin_lengths = new threeplugins/* THREE.Vector3 */.J.Vector3().set(
+        inst._margin_length.xLength,
+        inst._margin_length.yLength,
+        inst._margin_length.zLength
+      );
+      const f = new threeplugins/* THREE.Vector3 */.J.Vector3().set(
+        margin_lengths.x / margin_voxels.x,
+        margin_lengths.y / margin_voxels.y,
+        margin_lengths.z / margin_voxels.z
+      );
+      const mx = margin_voxels.x,
+            my = margin_voxels.y,
+            mz = margin_voxels.z;
+      const ct_data = inst._cube_values;
+
+      const delta = 4;
+      els.forEach((el) => {
+        const position = el.object.userData.construct_params.position;
+
+        let i = ( position[0] + ( margin_lengths.x - 1 ) / 2 ) / f.x;
+        let j = ( position[1] + ( margin_lengths.y - 1 ) / 2 ) / f.y;
+        let k = ( position[2] + ( margin_lengths.z - 1 ) / 2 ) / f.z;
+
+        i = Math.round( i );
+        j = Math.round( j );
+        k = Math.round( k );
+
+        if( i < 0 ){ i = 0; }
+        if( i >= mx ){ i = mx - 1; }
+        if( j < 0 ){ k = 0; }
+        if( j >= my ){ j = my - 1; }
+        if( k < 0 ){ k = 0; }
+        if( k >= mz ){ k = mz - 1; }
+
+        const new_ijk = [0, 0, 0];
+        let thred = ct_data[ i + j * mx + k * mx * my ];
+        let tmp, total_v = 0;
+        for(let i0 = Math.max(0, i - delta); i0 < Math.min(i + delta, mx); i0++ ) {
+          for(let j0 = Math.max(0, j - delta); j0 < Math.min(j + delta, my); j0++ ) {
+            for(let k0 = Math.max(0, k - delta); k0 < Math.min(k + delta, mz); k0++ ) {
+              tmp = ct_data[ i0 + j0 * mx + k0 * mx * my ];
+              if( tmp >= thred ) {
+                total_v += tmp;
+                new_ijk[0] += tmp * i0;
+                new_ijk[1] += tmp * j0;
+                new_ijk[2] += tmp * k0;
+              }
+            }
+          }
+        }
+        if( total_v <= 0 ){ return; }
+        new_ijk[0] /= total_v;
+        new_ijk[1] /= total_v;
+        new_ijk[2] /= total_v;
+
+        const x = (new_ijk[0] + 0.5) * f.x - ( margin_lengths.x - 1 ) / 2,
+              y = (new_ijk[1] - 0.5) * f.y - ( margin_lengths.y - 1 ) / 2,
+              z = (new_ijk[2] + 0.5) * f.z - ( margin_lengths.z - 1 ) / 2;
+
+        el.object.userData.construct_params.position[0] = x;
+        el.object.userData.construct_params.position[1] = y;
+        el.object.userData.construct_params.position[2] = z;
+
+        el.object.position.set( x, y, z );
+
+      });
+
+
+    }
+
+    // will get tkrRAS
+    const electrode_pos = () => {
+      const mode = edit_mode.getValue();
+      const scode = this.canvas.state_data.get("target_subject");
+      if( !mode || !scode || scode === "" ){ return; }
+      let pos_alt;
+      switch(mode){
+        case "CT/volume":
+          const inst = this.current_voxel_type();
+          pos_alt = electrode_from_ct( inst, this.canvas );
+          break;
+        case "MRI slice":
+          pos_alt = electrode_from_slice( scode, this.canvas );
+          break;
+        case "refine":
+          if(
+            refine_electrode &&
+            refine_electrode.isThreeBrainObject &&
+            (0,sphere/* is_electrode */.OK)( refine_electrode.object )
+          ){
+            pos.copy( refine_electrode.object.position );
+            pos_alt = pos;
+            break;
+          }
+        default:
+          return;
+      }
+      if( !pos_alt || !pos_alt.isVector3 || isNaN(pos_alt.x) ){ return; }
+      return( pos_alt );
+    };
+
+    window.electrode_pos = electrode_pos;
+    // add canvas update
+    this.canvas._custom_updates.set("localization_update", () => {
+      const electrode_position = electrode_pos();
+
+      if( !electrode_position ||
+          !electrode_position.isVector3 ){
+        tkr_loc.setValue("");
+        mni_loc.setValue("");
+        t1_loc.setValue("");
+        return;
+      }
+      const scode = this.canvas.state_data.get("target_subject"),
+            subject_data = this.canvas.shared_data.get( scode );
+
+      // tkrRAS
+      tkr_loc.setValue( (0,utils/* vec3_to_string */.Wk)( electrode_position ) );
+
+      // T1 ScannerRAS = Norig*inv(Torig)*[tkrR tkrA tkrS 1]'
+      electrode_position.applyMatrix4(
+        subject_data.matrices.tkrRAS_Scanner
+      );
+      t1_loc.setValue( (0,utils/* vec3_to_string */.Wk)( electrode_position ) );
+
+      // MNI305 = xfm * ScannerRAS
+      electrode_position.applyMatrix4(
+        subject_data.matrices.xfm
+      );
+      mni_loc.setValue( (0,utils/* vec3_to_string */.Wk)( electrode_position ) );
+
+    });
+
+    // bind dblclick
+    this.canvas.bind( 'localization_dblclick', 'dblclick',
+      (event) => {
+        const scode = this.canvas.state_data.get("target_subject"),
+              mode = edit_mode.getValue();
+        if(
+          !mode || mode == "disabled" ||
+          !scode || scode === ""
+        ){ return; }
+
+
+        if( mode === "CT/volume" || mode === "MRI slice" ){
+
+          // If mode is add,
+          const electrode_position = electrode_pos();
+          if(
+            !electrode_position ||
+            !electrode_position.isVector3 ||
+            isNaN( electrode_position.x )
+          ){ return; }
+
+          const num = electrodes.length + 1,
+              group_name = `group_Electrodes (${scode})`;
+          const el = add_electrode(scode, num, electrode_position, this.canvas);
+          el._mode = mode;
+          electrodes.push( el );
+          this.canvas.switch_subject();
+        } else {
+
+          // mode is to refine
+          // make electrode shine!
+          const el = this.canvas.object_chosen;
+          if( el && (0,sphere/* is_electrode */.OK)( el ) ){
+            if(
+              refine_electrode &&
+              refine_electrode.isThreeBrainObject &&
+              (0,sphere/* is_electrode */.OK)( refine_electrode.object )
+            ){
+              if( refine_electrode._enabled ){
+                refine_electrode.object.material.color.set( COL_ENABLED );
+              } else {
+                refine_electrode.object.material.color.set( COL_DISABLED );
+              }
+            }
+            refine_electrode = el.userData.instance;
+            el.material.color.set( COL_SELECTED );
+          }
+        }
+
+
+      }, this.canvas.main_canvas, false );
+
+    // bind adjustment
+    const adjust_electrode_position = (evt, nm, idx, step = 0.1) => {
+      if( !refine_electrode || !(0,sphere/* is_electrode */.OK)( refine_electrode.object ) ){ return; }
+      const mode = edit_mode.getValue();
+      if( mode !== "refine" ){ return; }
+      if( (0,utils/* has_meta_keys */.xy)( evt.event, false, false, false ) ){
+        // R
+        refine_electrode.object.position[nm] += step;
+        refine_electrode.object.userData.construct_params.position[idx] += step;
+      } else if( (0,utils/* has_meta_keys */.xy)( evt.event, true, false, false ) ){
+        // L
+        refine_electrode.object.position[nm] -= step;
+        refine_electrode.object.userData.construct_params.position[idx] -= step;
+      }
+      this._update_canvas();
+    }
+    this.canvas.add_keyboard_callabck( constants/* CONSTANTS.KEY_ADJUST_ELECTRODE_LOCATION_R */.t.KEY_ADJUST_ELECTRODE_LOCATION_R, (evt) => {
+      adjust_electrode_position(evt, "x", 0);
+    }, 'gui_refine_electrode_R');
+    this.canvas.add_keyboard_callabck( constants/* CONSTANTS.KEY_ADJUST_ELECTRODE_LOCATION_A */.t.KEY_ADJUST_ELECTRODE_LOCATION_A, (evt) => {
+      adjust_electrode_position(evt, "y", 1);
+    }, 'gui_refine_electrode_A');
+    this.canvas.add_keyboard_callabck( constants/* CONSTANTS.KEY_ADJUST_ELECTRODE_LOCATION_S */.t.KEY_ADJUST_ELECTRODE_LOCATION_S, (evt) => {
+      adjust_electrode_position(evt, "z", 2);
+    }, 'gui_refine_electrode_S');
+
+
+    // open folder
+    this.gui.open_folder( folder_name );
+
+    this.gui.hide_item([
+      ' - tkrRAS', ' - MNI305', ' - T1 RAS', 'Interpolate Size',
+      'Interpolate from Recently Added',
+      'Auto-Adjust Highlighted', 'Auto-Adjust All'
+    ], folder_name);
+  };
+
+  return( THREEBRAIN_PRESETS );
+
+}
+
+
+
+;// CONCATENATED MODULE: ./src/js/core/data_controls.js
+// 1. Background colors
+
+
+// 2. Record Videos
+
+
+// 3. Reset Camera
+// 4. Camera Position
+
+
+// 5. display axis anchor
+
+
+// 6. toggle side panel
+// 7. reset side panel position
+// 8. coronal, axial, sagittal position (depth)
+// 9. Electrode visibility in side canvas
+
+
+// 10. subject code
+
+
+
+// 11. surface type
+// 12. Hemisphere material/transparency
+// surface color
+
+
+// 13. electrode visibility, highlight, groups
+// 14. electrode mapping
+// 15. Highlight selected electrodes and info
+
+
+// 16. animation, play/pause, speed, clips...
+
+
+// 17. Voxel color type
+
+
+// 18. Electrode localization
+
+
+
+class THREEBRAIN_PRESETS{
+
+  /**
+   * Initialization, defines canvas (viewer), gui controller (viewer), and settings (initial values)
+   */
+  constructor(canvas, gui, settings, shiny){
+    this.canvas = canvas;
+    this.gui = gui;
+    this.settings = settings;
+    this.shiny = shiny;
+
+    this.electrode_regexp = RegExp('^electrodes-(.+)$');
+
+    // Min max of animation time
+    this.animation_time = [0,1];
+
+    this.cache = {};
+
+    this.canvas.bind( 'update_data_gui_controllers', 'switch_subject',
+      (evt) => {
+        this.update_self();
+      }, this.canvas.el );
+
+  }
+
+  // update gui controllers
+  update_self(){
+    this.update_voxel_type();
+    this.set_surface_ctype( true );
+
+    if( typeof(this._calculate_intersection_coord) === 'function' ){
+      this._calculate_intersection_coord();
+    }
+
+    this._update_canvas();
+  }
+
+  /**
+   * wrapper for this.canvas.start_animation and pause_animation
+   */
+  _update_canvas(level = 0){
+    if(level >= 0){
+      this.canvas.start_animation(level);
+    }else{
+      this.canvas.pause_animation(-level);
+    }
+  }
+
+  fire_change( args, priority = "deferred" ){
+
+    // fire gui.params first
+    this.shiny.to_shiny2('controllers', this.gui.params, "deferred");
+
+    if( typeof args === 'object' ){
+      for(let k in args){
+        // this.parameters[k] = args[k];
+
+        this.shiny.to_shiny2(k, args[k], priority);
+      }
+    }
+
+  }
+
+  c_syncviewer(){
+    if( this.shiny.shiny_mode ){
+      const folder_name = CONSTANTS.FOLDERS['sync-viewers'];
+      this.gui.add_item('Send to Other Viewers', () => {
+        this.fire_change({ 'sync' : this.shiny.uuid }, 'event' );
+      }, {folder_name: folder_name });
+    }
+  }
+
+
+}
+
+THREEBRAIN_PRESETS = register_controls_background( THREEBRAIN_PRESETS );
+THREEBRAIN_PRESETS = register_controls_record( THREEBRAIN_PRESETS );
+THREEBRAIN_PRESETS = register_controls_camera( THREEBRAIN_PRESETS );
+THREEBRAIN_PRESETS = register_controls_axis( THREEBRAIN_PRESETS );
+THREEBRAIN_PRESETS = register_controls_side_canvas( THREEBRAIN_PRESETS );
+THREEBRAIN_PRESETS = register_controls_subject( THREEBRAIN_PRESETS );
+THREEBRAIN_PRESETS = register_controls_surface( THREEBRAIN_PRESETS );
+THREEBRAIN_PRESETS = register_controls_electrodes( THREEBRAIN_PRESETS );
+THREEBRAIN_PRESETS = register_controls_animation( THREEBRAIN_PRESETS );
+THREEBRAIN_PRESETS = register_controls_voxels( THREEBRAIN_PRESETS );
+THREEBRAIN_PRESETS = register_controls_localization( THREEBRAIN_PRESETS );
+
+
+
+
+/***/ }),
+
+/***/ 2814:
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+"use strict";
+
+// EXPORTS
+__webpack_require__.d(__webpack_exports__, {
+  "E": () => (/* binding */ THREEBRAIN_CONTROL)
+});
+
+;// CONCATENATED MODULE: ./src/js/core/dat.gui.module.js
 /**
  * dat-gui JavaScript Controller Library
  * http://code.google.com/p/dat-gui
@@ -54433,2122 +57004,9 @@ var index = {
 /* harmony default export */ const dat_gui_module = ((/* unused pure expression or super */ null && (index)));
 //# sourceMappingURL=dat.gui.module.js.map
 
-// EXTERNAL MODULE: ./src/js/geometry/sphere.js
-var sphere = __webpack_require__(960);
 // EXTERNAL MODULE: ./src/js/utils.js
 var utils = __webpack_require__(3658);
-// EXTERNAL MODULE: ./src/js/constants.js
-var constants = __webpack_require__(975);
-;// CONCATENATED MODULE: ./src/js/capture/CCFrameEncoder.js
-function CCFrameEncoder( settings ) {
-
-	var _handlers = {};
-
-	this.settings = settings;
-
-	this.on = function(event, handler) {
-
-		_handlers[event] = handler;
-
-	};
-
-	this.emit = function(event) {
-
-		var handler = _handlers[event];
-		if (handler) {
-
-			handler.apply(null, Array.prototype.slice.call(arguments, 1));
-
-		}
-
-	};
-
-	this.filename = settings.name || new Date().toGMTString();
-	this.extension = '';
-	this.mimeType = '';
-
-}
-
-CCFrameEncoder.prototype.start = function(){};
-CCFrameEncoder.prototype.stop = function(){};
-CCFrameEncoder.prototype.add = function(){};
-CCFrameEncoder.prototype.save = function(){};
-CCFrameEncoder.prototype.dispose = function(){};
-CCFrameEncoder.prototype.safeToProceed = function(){ return true; };
-CCFrameEncoder.prototype.step = function() {  };
-
-
-
-
-// EXTERNAL MODULE: ./src/js/download.js
-var download = __webpack_require__(3121);
-;// CONCATENATED MODULE: ./src/js/capture/CCanvasRecorder.js
-
-
-// import { ArrayBufferDataStream, BlobBuffer, WebMWriter } from './webm-writer-0.2.0.js';
-
-
-/*
-	WebM Encoder
-*/
-
-class CCanvasRecorder extends CCFrameEncoder{
-  constructor( settings ){
-    super( settings );
-  	this.extension = '.webm';
-  	this.mimeType = 'video/webm;codecs=vp8,opus';
-  	this.baseFilename = this.filename;
-    this.framerate = settings.framerate;
-  	this.chunks = [];
-
-  	this.canvas = settings.canvas;
-
-  	// Create stream object
-    this.stream = this.canvas.captureStream( this.framerate );
-
-    // create a recorder fed with our canvas' stream
-    this.recorder = new MediaRecorder(this.stream, {mimeType : 'video/webm;codecs=vp8,opus'});
-
-    // save the chunks
-    this.recorder.ondataavailable = (e) => {
-      this.chunks.push(e.data);
-    };
-
-    // On stop, save data
-    this.recorder.onstop = (e) => {
-      this.save((blob) => {
-        console.log('Start to download...');
-        (0,download/* download */.L)( blob, this.filename + this.extension );
-      });
-      this.chunks.length = 0;
-    };
-  }
-
-  stop(){
-    if(this.recorder && this.recorder.state === 'recording'){
-      this.recorder.stop();
-    }
-  }
-
-  start(){
-    this.dispose();
-    this.recorder.start();
-  }
-
-  save( callback = null ) {
-    if( !callback ){
-      return(null);
-    }
-
-    if( this.chunks.length > 0 ){
-      let result = new Blob(this.chunks);
-      callback( result );
-    }
-
-  }
-
-  dispose() {
-    if(this.recorder){
-      this.stop();
-    }
-    this.chunks.length = 0;
-  }
-
-  add() {
-    /*
-    // , addInfo = '', background = '#ffffff', foreground = '#000000'
-
-    // Add additional messages
-    if( addInfo && addInfo !== '' ){
-      // Add additional information
-      const font_size = this.ratio * 20;
-      this.context.font = `${font_size}px Georgia`;
-      this.context.fillStyle = foreground;
-      const ss = addInfo.split('\n');
-      for (let ii in ss ){
-        this.context.fillText(ss[ii], 10, 50 + 1.4 * font_size * ii);
-      }
-
-    }
-    */
-  }
-}
-
-
-// CCWebMEncoder.prototype = Object.create( CCFrameEncoder.prototype );
-
-
-
-// EXTERNAL MODULE: ./node_modules/downloadjs/download.js
-var downloadjs_download = __webpack_require__(3729);
-;// CONCATENATED MODULE: ./src/js/data_controls.js
-
-
-
-
-
-
-
-// Some presets for gui and canvas
-
-
-function has_meta_keys( event, shift = true, ctrl = true, alt = true){
-  let v1 = 0 + event.shiftKey + event.ctrlKey * 2 + event.altKey * 4,
-      v2 = 0 + shift + ctrl * 2 + alt * 4;
-  if( v1 === v2 ){
-    return(true);
-  }
-  return( false );
-}
-/**
- * @author: Zhengjia Wang
- * Defines model (logic) part for dat.GUI
- */
-class THREEBRAIN_PRESETS{
-
-  /**
-   * Initialization, defines canvas (viewer), gui controller (viewer), and settings (initial values)
-   */
-  constructor(canvas, gui, settings, shiny){
-    this.canvas = canvas;
-    this.gui = gui;
-    this.settings = settings;
-    this.shiny = shiny;
-
-    this.electrode_regexp = RegExp('^electrodes-(.+)$');
-
-    // Min max of animation time
-    this.animation_time = [0,1];
-
-    this.cache = {};
-
-    this.canvas.bind( 'update_data_gui_controllers', 'switch_subject',
-      (evt) => {
-        this.update_self();
-      }, this.canvas.el );
-
-  }
-
-  // update gui controllers
-  update_self(){
-    this.update_voxel_type();
-    this.set_surface_ctype( true );
-
-    if( typeof(this._calculate_intersection_coord) === 'function' ){
-      this._calculate_intersection_coord();
-    }
-
-    this._update_canvas();
-  }
-
-  /**
-   * wrapper for this.canvas.start_animation and pause_animation
-   */
-  _update_canvas(level = 0){
-    if(level >= 0){
-      this.canvas.start_animation(level);
-    }else{
-      this.canvas.pause_animation(-level);
-    }
-  }
-
-  fire_change( args, priority = "deferred" ){
-
-    // fire gui.params first
-    this.shiny.to_shiny2('controllers', this.gui.params, "deferred");
-
-    if( typeof args === 'object' ){
-      for(let k in args){
-        // this.parameters[k] = args[k];
-
-        this.shiny.to_shiny2(k, args[k], priority);
-      }
-    }
-
-  }
-
-
-  // ------------------------------ Defaults -----------------------------------
-  // toc (table of contents):
-  // 1. Background colors
-  // 2. Record Videos
-  // 3. Reset Camera
-  // 4. Camera Position
-  // 5. display anchor
-  // 6. toggle side panel
-  // 7. reset side panel position
-  // 8. coronal, axial, sagittal position (depth)
-  // 9. Electrode visibility in side canvas
-  // 10. subject code
-  // 11. surface type
-  // 12. Hemisphere material/transparency
-  // 13. electrode visibility, highlight, groups
-  // 14. electrode mapping
-  // 15. animation, play/pause, speed, clips...
-  // 16. Highlight selected electrodes and info
-
-  // 1. Background colors
-  c_background(){
-    const initial_bgcolor = this.settings.background || "#ffffff",
-          folder_name = constants/* CONSTANTS.FOLDERS.background-color */.t.FOLDERS["background-color"];
-
-    this.gui.add_item('Background Color', '#FFFFFF', {is_color : true, folder_name: folder_name})
-      .onChange((v) => {
-
-        // calculate inversed color for text
-        const inversedColor = (0,utils/* invertColor */.qd)(v);
-
-        this.canvas.background_color = v;
-        this.canvas.foreground_color = inversedColor;
-
-        // Set renderer background to be v
-        this.canvas.main_renderer.setClearColor(v);
-        this.canvas.side_renderer.setClearColor(v);
-
-        // this.el_text.style.color=inversedColor;
-        // this.el_text2.style.color=inversedColor;
-        // this.el.style.backgroundColor = v;
-        this.canvas.el.style.backgroundColor = v;
-
-        this.fire_change({ 'background' : v });
-
-        // force re-render
-        this._update_canvas(0);
-      })
-      .setValue( initial_bgcolor );
-
-  }
-
-  c_syncviewer(){
-    if( this.shiny.shiny_mode ){
-      const folder_name = constants/* CONSTANTS.FOLDERS.sync-viewers */.t.FOLDERS["sync-viewers"];
-      this.gui.add_item('Send to Other Viewers', () => {
-        this.fire_change({ 'sync' : this.shiny.uuid }, 'event' );
-      }, {folder_name: folder_name });
-    }
-  }
-
-
-  // 2. Record Videos
-  c_recorder(){
-    const folder_name = constants/* CONSTANTS.FOLDERS.video-recorder */.t.FOLDERS["video-recorder"];
-    this.gui.add_item('Record Video', false, {folder_name: folder_name })
-      .onChange((v) =>{
-
-        if(v){
-          // create capture object
-          if( !this.canvas.capturer ){
-            this.canvas.capturer = new CCanvasRecorder({
-              canvas: this.canvas.domElement,
-              // FPS = 15
-              framerate: 24,
-              // Capture as webm
-              format: 'webm',
-              // workersPath: 'lib/',
-              // verbose results?
-              verbose: true,
-              autoSaveTime : 0,
-              main_width: this.canvas.main_renderer.domElement.width,
-              main_height: this.canvas.main_renderer.domElement.height,
-              sidebar_width: 300,
-              pixel_ratio : this.canvas.main_renderer.domElement.width / this.canvas.main_renderer.domElement.clientWidth
-            });
-          }
-
-          this.canvas.capturer.baseFilename = this.canvas.capturer.filename = new Date().toGMTString();
-          this.canvas.capturer.start();
-          this.canvas.capturer_recording = true;
-          // Force render a frame
-          // Canvas might not render
-          // this.canvas.start_animation(0);
-        }else{
-          this.canvas.capturer_recording = false;
-          if(this.canvas.capturer){
-            this.canvas.capturer.stop();
-            this.canvas.capturer.save();
-            // this.canvas.capturer.incoming = false;
-          }
-        }
-
-
-      });
-
-    this.gui.add_item('Screenshot', () => {
-      /* const img = this.canvas.domElement.toDataURL('image/png');
-      const _d = new Date().toJSON();
-
-      download(img, `[rave-brain] ${_d}.png`, 'image/png'); */
-      const _d = new Date().toJSON();
-      const doc = this.canvas.mapToPDF();
-      doc.save(`[rave-brain] ${_d}.pdf`);
-    }, {folder_name: folder_name });
-
-  }
-
-  // 3. Reset Camera
-  c_reset_camera(){
-    const folder_name = constants/* CONSTANTS.FOLDERS.reset-main-camera */.t.FOLDERS["reset-main-camera"];
-    this.gui.add_item('Reset', () => {
-      // Center camera first.
-      this.canvas.handle_resize( undefined, undefined, false, true );
-      this.canvas.reset_controls();
-      this.canvas.controls.enabled = true;
-    }, {folder_name: folder_name});
-  }
-
-  // 4. Camera Position
-  c_main_camera_position(){
-    const folder_name = constants/* CONSTANTS.FOLDERS.main-camera-position */.t.FOLDERS["main-camera-position"];
-    const camera_pos = this.gui.add_item('Camera Position', '[free rotate]', {
-      args : ['[free rotate]', '[lock]', 'right', 'left', 'anterior', 'posterior', 'superior', 'inferior'],
-      folder_name : folder_name
-    }).onChange((v) => {
-
-      if( v === '[lock]' ){
-        this.canvas.controls.enabled = false;
-        return( null );
-      }
-      this.canvas.controls.enabled = true;
-
-      switch (v) {
-        case 'right':
-          this.canvas.main_camera.position.set( 500, 0, 0 );
-          this.canvas.main_camera.up.set( 0, 0, 1 );
-          break;
-        case 'left':
-          this.canvas.main_camera.position.set( -500, 0, 0 );
-          this.canvas.main_camera.up.set( 0, 0, 1 );
-          break;
-        case 'anterior':
-          this.canvas.main_camera.position.set( 0, 500, 0 );
-          this.canvas.main_camera.up.set( 0, 0, 1 );
-          break;
-        case 'posterior':
-          this.canvas.main_camera.position.set( 0, -500, 0 );
-          this.canvas.main_camera.up.set( 0, 0, 1 );
-          break;
-        case 'superior':
-          this.canvas.main_camera.position.set( 0, 0, 500 );
-          this.canvas.main_camera.up.set( 0, 1, 0 );
-          break;
-        case 'inferior':
-          this.canvas.main_camera.position.set( 0, 0, -500 );
-          this.canvas.main_camera.up.set( 0, 1, 0 );
-          break;
-      }
-
-      camera_pos.__select.value = '[free rotate]';
-
-      this._update_canvas();
-    });
-    /**
-     * initialize camera position. This requires `__reset_flag` from Canvas
-     * If __reset_flag=false, this means we are in shiny_mode and the widget
-     * has already been loaded once
-     */
-
-    if( this.canvas.__reset_flag ){
-      const inital_camera_pos = new threeplugins/* THREE.Vector3 */.J.Vector3().fromArray(
-        this.settings.camera_pos
-      );
-      if (inital_camera_pos.length() > 0){
-        this.canvas.main_camera.position.set(
-          inital_camera_pos.x,
-          inital_camera_pos.y,
-          inital_camera_pos.z
-        ).normalize().multiplyScalar(500);
-        if( inital_camera_pos.x !== 0 || inital_camera_pos.y !== 0 ){
-          this.canvas.main_camera.up.set( 0, 0, 1 );
-        } else {
-          this.canvas.main_camera.up.set( 0, 1, 0 );
-        }
-      }
-    }
-
-    this._update_canvas();
-  }
-
-  // 5. display anchor
-  c_toggle_anchor(){
-    const folder_name = constants/* CONSTANTS.FOLDERS.toggle-helpper */.t.FOLDERS["toggle-helpper"];
-    this.gui.add_item('Display Coordinates', false, { folder_name: folder_name })
-      .onChange((v) => {
-        this.canvas.set_cube_anchor_visibility(v);
-        this.fire_change();
-      });
-  }
-
-  // 6. toggle side panel
-  c_toggle_side_panel(){
-    const folder_name = constants/* CONSTANTS.FOLDERS.toggle-side-panels */.t.FOLDERS["toggle-side-panels"];
-    const _v = this.settings.side_display || false;
-
-    const show_side = this.gui.add_item('Show Panels', _v, {folder_name: folder_name})
-      .onChange((v) => {
-        if( v ){
-          this.canvas.enable_side_cameras();
-        }else{
-          this.canvas.disable_side_cameras();
-        }
-        this.fire_change({ 'side_display' : v });
-      });
-
-
-    if( _v ){
-      this.canvas.enable_side_cameras();
-    }else{
-      this.canvas.disable_side_cameras();
-    }
-    this.fire_change({ 'side_display' : _v });
-
-  }
-
-
-
-  // 7. reset side panel position
-  c_reset_side_panel(){
-    const folder_name = constants/* CONSTANTS.FOLDERS.reset-side-panels */.t.FOLDERS["reset-side-panels"],
-          zoom_level = this.settings.side_canvas_zoom,
-          side_width = this.settings.side_canvas_width,
-          side_shift = this.settings.side_canvas_shift;
-    this.gui.add_item('Reset Position', () => {
-      this.canvas.reset_side_canvas( zoom_level, side_width, side_shift );
-    }, {folder_name: folder_name});
-
-    // reset first
-    this.canvas._side_width = side_width;
-    this.canvas.reset_side_canvas( zoom_level, side_width, side_shift );
-  }
-
-  // 8. coronal, axial, sagittal position (depth)
-  c_side_depth(){
-    const folder_name = constants/* CONSTANTS.FOLDERS.side-three-planes */.t.FOLDERS["side-three-planes"];
-
-    const _calculate_intersection_coord = () => {
-      console.debug('Recalculate MNI305 for plane intersections');
-      // MNI 305 position of the intersection
-      const ints_z = this.canvas.state_data.get( 'axial_posz' ) || 0,
-            ints_y = this.canvas.state_data.get( 'coronal_posy' ) || 0,
-            ints_x = this.canvas.state_data.get( 'sagittal_posx' ) || 0;
-      const point = new threeplugins/* THREE.Vector3 */.J.Vector3().set(ints_x, ints_y, ints_z);
-      this.canvas.calculate_mni305( point );
-      // set controller
-      _controller_mni305.setValue(`${point.x.toFixed(1)}, ${point.y.toFixed(1)}, ${point.z.toFixed(1)}`);
-    };
-    this._calculate_intersection_coord = _calculate_intersection_coord;
-
-    /*this.canvas.bind( 'c_side_depth_subject_changed', 'switch_subject', (e) => {
-		  _calculate_intersection_coord();
-		}, this.canvas.el);*/
-
-    // side plane
-    const _controller_coronal = this.gui
-      .add_item('Coronal (P - A)', 0, {folder_name: folder_name})
-      .min(-128).max(128).step(1).onChange((v) => {
-        this.canvas.set_coronal_depth( v );
-        this.fire_change({ 'coronal_depth' : v });
-        _calculate_intersection_coord();
-      });
-    this.gui.add_tooltip( constants/* CONSTANTS.TOOLTIPS.KEY_MOVE_CORONAL */.t.TOOLTIPS.KEY_MOVE_CORONAL, 'Coronal (P - A)', folder_name);
-
-    const _controller_axial = this.gui
-      .add_item('Axial (I - S)', 0, {folder_name: folder_name})
-      .min(-128).max(128).step(1).onChange((v) => {
-        this.canvas.set_axial_depth( v );
-        this.fire_change({ 'axial_depth' : v });
-        _calculate_intersection_coord();
-      });
-    this.gui.add_tooltip( constants/* CONSTANTS.TOOLTIPS.KEY_MOVE_AXIAL */.t.TOOLTIPS.KEY_MOVE_AXIAL, 'Axial (I - S)', folder_name);
-
-    const _controller_sagittal = this.gui
-      .add_item('Sagittal (L - R)', 0, {folder_name: folder_name})
-      .min(-128).max(128).step(1).onChange((v) => {
-        this.canvas.set_sagittal_depth( v );
-        this.fire_change({ 'sagittal_depth' : v });
-        _calculate_intersection_coord();
-      });
-    this.gui.add_tooltip( constants/* CONSTANTS.TOOLTIPS.KEY_MOVE_SAGITTAL */.t.TOOLTIPS.KEY_MOVE_SAGITTAL, 'Sagittal (L - R)', folder_name);
-
-    const _controller_mni305 = this.gui
-      .add_item('Intersect MNI305', "NaN, NaN, NaN", {folder_name: folder_name});
-
-    this.fire_change({ 'coronal_depth' : 0 });
-    this.fire_change({ 'axial_depth' : 0 });
-    this.fire_change({ 'sagittal_depth' : 0 });
-
-    [ _controller_coronal, _controller_axial, _controller_sagittal ].forEach((_c, ii) => {
-
-      this.canvas.bind( `dat_gui_side_controller_${ii}_mousewheel`, 'mousewheel',
-        (evt) => {
-          if( evt.altKey ){
-            evt.preventDefault();
-            const current_val = _c.getValue();
-            _c.setValue( current_val + evt.deltaY );
-          }
-        }, _c.domElement );
-
-    });
-
-    this.canvas.set_side_depth = (c, a, s) => {
-      if( typeof c === 'number' ){
-        _controller_coronal.setValue( c );
-      }
-      if( typeof a === 'number' ){
-        _controller_axial.setValue( a || 0 );
-      }
-      if( typeof s === 'number' ){
-        _controller_sagittal.setValue( s || 0 );
-      }
-    };
-
-    const overlay_coronal = this.gui.add_item('Overlay Coronal', false,
-      {folder_name: folder_name})
-      .onChange((v) => {
-        this.canvas.set_side_visibility('coronal', v);
-        this.fire_change({ 'coronal_visibility' : v });
-      });
-    this.gui.add_tooltip( constants/* CONSTANTS.TOOLTIPS.KEY_OVERLAY_CORONAL */.t.TOOLTIPS.KEY_OVERLAY_CORONAL, 'Overlay Coronal', folder_name);
-
-    const overlay_axial = this.gui.add_item('Overlay Axial', false,
-      {folder_name: folder_name})
-      .onChange((v) => {
-        this.canvas.set_side_visibility('axial', v);
-        this.fire_change({ 'axial_visibility' : v });
-      });
-    this.gui.add_tooltip( constants/* CONSTANTS.TOOLTIPS.KEY_OVERLAY_AXIAL */.t.TOOLTIPS.KEY_OVERLAY_AXIAL, 'Overlay Axial', folder_name);
-
-    const overlay_sagittal = this.gui.add_item('Overlay Sagittal', false,
-      {folder_name: folder_name})
-      .onChange((v) => {
-        this.canvas.set_side_visibility('sagittal', v);
-        this.fire_change({ 'sagittal_visibility' : v });
-      });
-    this.gui.add_tooltip( constants/* CONSTANTS.TOOLTIPS.KEY_OVERLAY_SAGITTAL */.t.TOOLTIPS.KEY_OVERLAY_SAGITTAL, 'Overlay Sagittal', folder_name);
-
-    this.fire_change({ 'coronal_visibility' : false });
-    this.fire_change({ 'axial_visibility' : false });
-    this.fire_change({ 'sagittal_visibility' : false });
-
-    // register overlay keyboard shortcuts
-    this.canvas.add_keyboard_callabck( constants/* CONSTANTS.KEY_OVERLAY_CORONAL */.t.KEY_OVERLAY_CORONAL, (evt) => {
-      if( has_meta_keys( evt.event, true, false, false ) ){
-        const _v = overlay_coronal.getValue();
-        overlay_coronal.setValue( !_v );
-      }
-    }, 'overlay_coronal');
-
-    this.canvas.add_keyboard_callabck( constants/* CONSTANTS.KEY_MOVE_CORONAL */.t.KEY_MOVE_CORONAL, (evt) => {
-      const _v = _controller_coronal.getValue();
-      if( has_meta_keys( evt.event, true, false, false ) ){
-        _controller_coronal.setValue( _v - 1 );
-      }else if( has_meta_keys( evt.event, false, false, false ) ){
-        _controller_coronal.setValue( _v + 1 );
-      }
-    }, 'move_coronal');
-
-
-    this.canvas.add_keyboard_callabck( constants/* CONSTANTS.KEY_OVERLAY_AXIAL */.t.KEY_OVERLAY_AXIAL, (evt) => {
-      if( has_meta_keys( evt.event, true, false, false ) ){
-        const _v = overlay_axial.getValue();
-        overlay_axial.setValue( !_v );
-      }
-    }, 'overlay_axial');
-
-    this.canvas.add_keyboard_callabck( constants/* CONSTANTS.KEY_MOVE_AXIAL */.t.KEY_MOVE_AXIAL, (evt) => {
-      const _v = _controller_axial.getValue();
-      if( has_meta_keys( evt.event, true, false, false ) ){
-        _controller_axial.setValue( _v - 1 );
-      }else if( has_meta_keys( evt.event, false, false, false ) ){
-        _controller_axial.setValue( _v + 1 );
-      }
-    }, 'move_axial');
-
-    this.canvas.add_keyboard_callabck( constants/* CONSTANTS.KEY_OVERLAY_SAGITTAL */.t.KEY_OVERLAY_SAGITTAL, (evt) => {
-      if( has_meta_keys( evt.event, true, false, false ) ){
-        const _v = overlay_sagittal.getValue();
-        overlay_sagittal.setValue( !_v );
-      }
-    }, 'overlay_sagittal');
-
-    this.canvas.add_keyboard_callabck( constants/* CONSTANTS.KEY_MOVE_SAGITTAL */.t.KEY_MOVE_SAGITTAL, (evt) => {
-      const _v = _controller_sagittal.getValue();
-      if( has_meta_keys( evt.event, true, false, false ) ){
-        _controller_sagittal.setValue( _v - 1 );
-      }else if( has_meta_keys( evt.event, false, false, false ) ){
-        _controller_sagittal.setValue( _v + 1 );
-      }
-    }, 'move_sagittal');
-  }
-
-  // 9. Electrode visibility in side canvas
-  c_side_electrode_dist(){
-    const folder_name = constants/* CONSTANTS.FOLDERS.side-electrode-dist */.t.FOLDERS["side-electrode-dist"];
-    // show electrodes trimmed
-    this.gui.add_item('Dist. Threshold', 2, { folder_name: folder_name })
-      .min(0).max(64).step(0.1)
-      .onChange((v) => {
-        this.canvas.trim_electrodes( v );
-        this._update_canvas();
-        this.fire_change();
-      });
-    this.canvas.trim_electrodes( 2 );
-  }
-
-  // 10. subject code
-  c_subject2(){
-    // Get subjects
-    const folder_name = constants/* CONSTANTS.FOLDERS.subject-selector */.t.FOLDERS["subject-selector"],
-          subject_ids = this.canvas.subject_codes;
-
-    if( subject_ids.length > 0 ){
-      let _s = this.canvas.state_data.get( 'target_subject' ) || subject_ids[0];
-      this.gui.add_item('Subject', _s, {
-        folder_name : folder_name,
-        args : subject_ids
-      }).onChange((v) => {
-        this.canvas.switch_subject( v );
-        this.fire_change();
-      });
-
-      this.canvas.switch_subject();
-    }else{
-      // controller center
-      this.canvas.update_control_center( this.settings.control_center );
-    }
-
-  }
-
-  // 11. surface type
-  c_surface_type2(){
-
-    const folder_name = constants/* CONSTANTS.FOLDERS.surface-selector */.t.FOLDERS["surface-selector"],
-          _s = this.canvas.state_data.get( 'surface_type' ) || 'pial',
-          _c = this.canvas.get_surface_types(),
-          _mty = this.canvas.state_data.get( 'surface_material_type' ) || 'MeshPhongMaterial',
-          _mtyc = ['MeshPhongMaterial', 'MeshLambertMaterial'];
-
-    if( _c.length === 0 ){
-      return(null);
-    }
-    const surf_type = this.gui.add_item('Surface Type', _s, {args : _c, folder_name : folder_name })
-      .onChange((v) => {
-        this.canvas.switch_subject( '/', {
-          'surface_type': v
-        });
-        this.fire_change({ 'surface_type' : v });
-      });
-    this.fire_change({ 'surface_type' : _s });
-    this.gui.add_tooltip( constants/* CONSTANTS.TOOLTIPS.KEY_CYCLE_SURFACE */.t.TOOLTIPS.KEY_CYCLE_SURFACE, 'Surface Type', folder_name);
-
-    this.canvas.add_keyboard_callabck( constants/* CONSTANTS.KEY_CYCLE_SURFACE */.t.KEY_CYCLE_SURFACE, (evt) => {
-      if( has_meta_keys( evt.event, false, false, false ) ){
-        let current_idx = (_c.indexOf( surf_type.getValue() ) + 1) % _c.length;
-        if( current_idx >= 0 ){
-          surf_type.setValue( _c[ current_idx ] );
-        }
-      }
-    }, 'gui_surf_type2');
-
-
-    const surf_material = this.gui.add_item('Surface Material', _mty, {
-      args : _mtyc, folder_name : folder_name })
-      .onChange((v) => {
-        this.canvas.state_data.set( 'surface_material_type', v );
-        this.fire_change({ 'surface_material' : v });
-        this._update_canvas();
-      });
-    this.fire_change({ 'surface_material' : _mty });
-    this.gui.add_tooltip( constants/* CONSTANTS.TOOLTIPS.KEY_CYCLE_MATERIAL */.t.TOOLTIPS.KEY_CYCLE_MATERIAL, 'Surface Material', folder_name);
-
-
-    this.canvas.add_keyboard_callabck( constants/* CONSTANTS.KEY_CYCLE_MATERIAL */.t.KEY_CYCLE_MATERIAL, (evt) => {
-      if( has_meta_keys( evt.event, true, false, false ) ){
-        let current_idx = (_mtyc.indexOf( surf_material.getValue() ) + 1) % _mtyc.length;
-        if( current_idx >= 0 ){
-          surf_material.setValue( _mtyc[ current_idx ] );
-        }
-      }
-    }, 'gui_surf_material');
-
-
-  }
-
-  // 12. Hemisphere material/transparency
-  c_hemisphere_material(){
-
-    const folder_name = constants/* CONSTANTS.FOLDERS.hemisphere-material */.t.FOLDERS["hemisphere-material"],
-          options = ['normal', 'wireframe', 'hidden'];
-
-    const lh_ctrl = this.gui.add_item('Left Hemisphere', 'normal',{ args : options, folder_name : folder_name })
-      .onChange((v) => {
-        this.canvas.switch_subject( '/', { 'material_type_left': v });
-        this.fire_change();
-      });
-    this.gui.add_tooltip( constants/* CONSTANTS.TOOLTIPS.KEY_CYCLE_LEFT */.t.TOOLTIPS.KEY_CYCLE_LEFT, 'Left Hemisphere', folder_name);
-
-    const rh_ctrl = this.gui.add_item('Right Hemisphere', 'normal',{ args : options, folder_name : folder_name })
-      .onChange((v) => {
-        this.canvas.switch_subject( '/', { 'material_type_right': v });
-        this.fire_change();
-      });
-    this.gui.add_tooltip( constants/* CONSTANTS.TOOLTIPS.KEY_CYCLE_RIGHT */.t.TOOLTIPS.KEY_CYCLE_RIGHT, 'Right Hemisphere', folder_name);
-
-    const lh_trans = this.gui.add_item('Left Opacity', 1.0, { folder_name : folder_name })
-    .min( 0.1 ).max( 1 ).step( 0.1 )
-      .onChange((v) => {
-        this.canvas.switch_subject( '/', { 'surface_opacity_left': v });
-        this.fire_change();
-      });
-    this.gui.add_tooltip( '⇧' + constants/* CONSTANTS.TOOLTIPS.KEY_CYCLE_LEFT */.t.TOOLTIPS.KEY_CYCLE_LEFT, 'Left Opacity', folder_name);
-
-    const rh_trans = this.gui.add_item('Right Opacity', 1.0, { folder_name : folder_name })
-    .min( 0.1 ).max( 1 ).step( 0.1 )
-      .onChange((v) => {
-        this.canvas.switch_subject( '/', { 'surface_opacity_right': v });
-        this.fire_change();
-      });
-    this.gui.add_tooltip( '⇧' + constants/* CONSTANTS.TOOLTIPS.KEY_CYCLE_RIGHT */.t.TOOLTIPS.KEY_CYCLE_RIGHT, 'Right Opacity', folder_name);
-
-    // add keyboard shortcut
-    this.canvas.add_keyboard_callabck( constants/* CONSTANTS.KEY_CYCLE_LEFT */.t.KEY_CYCLE_LEFT, (evt) => {
-      if( has_meta_keys( evt.event, true, false, false ) ){
-        let current_opacity = lh_trans.getValue() - 0.3;
-        if( current_opacity < 0 ){ current_opacity = 1; }
-        lh_trans.setValue( current_opacity );
-      }else if( has_meta_keys( evt.event, false, false, false ) ){
-        let current_idx = (options.indexOf( lh_ctrl.getValue() ) + 1) % options.length;
-        if( current_idx >= 0 ){
-          lh_ctrl.setValue( options[ current_idx ] );
-        }
-      }
-    }, 'gui_left_cycle');
-
-    this.canvas.add_keyboard_callabck( constants/* CONSTANTS.KEY_CYCLE_RIGHT */.t.KEY_CYCLE_RIGHT, (evt) => {
-      if( has_meta_keys( evt.event, true, false, false ) ){
-        let current_opacity = rh_trans.getValue() - 0.3;
-        if( current_opacity < 0 ){ current_opacity = 1; }
-        rh_trans.setValue( current_opacity );
-      }else if( has_meta_keys( evt.event, false, false, false ) ){
-        let current_idx = (options.indexOf( rh_ctrl.getValue() ) + 1) % options.length;
-        if( current_idx >= 0 ){
-          rh_ctrl.setValue( options[ current_idx ] );
-        }
-      }
-    }, 'gui_right_cycle');
-  }
-
-  get_surface_ctype(){
-    const _c = this.gui.get_controller( 'Surface Color' );
-    if( _c.isfake ){ return( "none" ); }
-    return( _c.getValue() );
-  }
-  set_surface_ctype( t, params = {} ){
-
-    if( !this._surface_ctype_map ){ return; }
-    if (t === undefined){ return; }
-    let ctype = t,
-        sigma = params.sigma,
-        blend = params.blend,
-        decay = params.decay,
-        radius = params.radius;
-
-    if( t === true ){
-      // refresh
-      ctype = this._current_surface_ctype;
-    }
-    if( !ctype ){ ctype = "vertices"; }
-    this._current_surface_ctype = ctype;
-
-    let _c;
-    if( sigma === undefined ){
-      _c = this.gui.get_controller( 'Sigma' );
-      if( _c.isfake ){ sigma = 3.0; } else { sigma = _c.getValue(); }
-    }
-    if( blend === undefined ){
-      _c = this.gui.get_controller( 'Blend Factor' );
-      if( _c.isfake ){ blend = 0.4; } else { blend = _c.getValue(); }
-    }
-    if( decay === undefined ){
-      _c = this.gui.get_controller( 'Decay' );
-      if( _c.isfake ){ decay = 0.15; } else { decay = _c.getValue(); }
-    }
-    if( radius === undefined ){
-      _c = this.gui.get_controller( 'Range Limit' );
-      if( _c.isfake ){ radius = 10.0; } else { radius = _c.getValue(); }
-    }
-
-    let col_code = this._surface_ctype_map[ ctype ];
-    if( col_code === undefined ){
-      col_code = constants/* CONSTANTS.VERTEX_COLOR */.t.VERTEX_COLOR;
-      this._current_surface_ctype = "vertices";
-    }
-    let f = (el) => {
-      if( !(el.isFreeMesh && el._material_options) ){ return; }
-      el._material_options.which_map.value = col_code;
-      el._material_options.blend_factor.value = blend;
-      el._material_options.elec_decay.value = decay;
-      el._material_options.elec_radius.value = radius;
-
-      if( el.object.visible && col_code === constants/* CONSTANTS.VOXEL_COLOR */.t.VOXEL_COLOR ){
-        // need to get current active datacube2
-        const inst = this.current_voxel_type();
-        if( inst ){
-          el._set_color_from_datacube2(inst, sigma);
-        } else {
-          el._material_options.which_map.value = constants/* CONSTANTS.DEFAULT_COLOR */.t.DEFAULT_COLOR;
-        }
-      }
-    };
-
-
-    this.canvas.threebrain_instances.forEach( f );
-
-    this._update_canvas();
-    this.fire_change({ 'surface_color_type' : this._current_surface_ctype });
-
-  }
-
-  c_surface_color(){
-    const folder_name = constants/* CONSTANTS.FOLDERS.surface-selector */.t.FOLDERS["surface-selector"],
-          maps = {
-            'vertices' : constants/* CONSTANTS.VERTEX_COLOR */.t.VERTEX_COLOR,
-            'sync from voxels' : constants/* CONSTANTS.VOXEL_COLOR */.t.VOXEL_COLOR,
-            'sync from electrodes' : constants/* CONSTANTS.ELECTRODE_COLOR */.t.ELECTRODE_COLOR,
-            'none' : constants/* CONSTANTS.DEFAULT_COLOR */.t.DEFAULT_COLOR
-          },
-          options = Object.keys( maps );
-    this._surface_ctype_map = maps;
-    let col = 'vertices';
-
-    this.gui.add_item('Surface Color', col, {args : options, folder_name : folder_name })
-      .onChange((v) => {
-        this.gui.hide_item(['Blend Factor', 'Sigma', 'Decay', 'Range Limit'], folder_name);
-        const last_ctype = this._current_surface_ctype;
-        this.canvas.__hide_voxels = false;
-        this.set_surface_ctype( v );
-
-        if( this._current_surface_ctype !== "none" ){
-          this.gui.show_item(['Blend Factor'], folder_name);
-        }
-
-        if( this._current_surface_ctype === "sync from voxels" ){
-          this.gui.show_item(['Sigma'], folder_name);
-          this.canvas.__hide_voxels = true;
-        } else {
-          if( last_ctype === "sync from voxels" ) {
-            // leaving, have to set voxels to none
-            this.canvas.__hide_voxels = true;
-          }
-          if( this._current_surface_ctype === "sync from electrodes" ){
-            this.gui.show_item(['Decay', 'Range Limit'], folder_name);
-          }
-        }
-        this._update_canvas();
-      });
-
-    this.canvas.add_keyboard_callabck( constants/* CONSTANTS.KEY_CYCLE_SURFACE_COLOR */.t.KEY_CYCLE_SURFACE_COLOR, (evt) => {
-      if( has_meta_keys( evt.event, false, false, false ) ){
-        // options
-        const _c = this.gui.get_controller( "Surface Color" );
-
-        let current_idx = (options.indexOf( _c.getValue() ) + 1) % options.length;
-        if( current_idx >= 0 ){
-          _c.setValue( options[ current_idx ] );
-        }
-      }
-    }, 'gui_surf_color_type');
-    this.gui.add_tooltip( constants/* CONSTANTS.TOOLTIPS.KEY_CYCLE_SURFACE_COLOR */.t.TOOLTIPS.KEY_CYCLE_SURFACE_COLOR, 'Surface Color', folder_name);
-
-    const blend_factor = this.gui.add_item(
-      "Blend Factor", 0.4, { folder_name : folder_name })
-      .min( 0 ).max( 1 )
-      .onChange((v) => {
-        if( typeof(v) != "number" ){
-          v = 0.4;
-        } else if( v < 0 ){
-          v = 0;
-        } else if (v > 1){
-          v = 1;
-        }
-        this.set_surface_ctype( true, { 'blend' : v } );
-        this._update_canvas();
-      })
-
-    // ---------- for voxel-color ---------------
-
-    const map_delta = this.gui.add_item("Sigma", 3.0, { folder_name : folder_name })
-      .min( 0 ).max( 10 )
-      .onChange((v) => {
-        if( v !== undefined ){
-          if( v < 0 ){ v = 0; }
-          this.set_surface_ctype( true, { 'sigma' : v } );
-          this._update_canvas();
-        }
-      });
-
-    // ---------- for electrode maps ------------
-    this.gui.add_item("Decay", 0.15, { folder_name : folder_name })
-      .min( 0.05 ).max( 1 ).step( 0.05 )
-      .onChange((v) => {
-        if( v !== undefined ){
-          if( v < 0.05 ){ v = 0.05; }
-          this.set_surface_ctype( true, { 'decay' : v } );
-          this._update_canvas();
-        }
-      });
-
-    this.gui.add_item("Range Limit", 10.0, { folder_name : folder_name })
-      .min( 1.0 ).max( 30.0 ).step( 1.0 )
-      .onChange((v) => {
-        if( v !== undefined ){
-          if( v < 1.0 ){ v = 1.0; }
-          this.set_surface_ctype( true, { 'radius' : v } );
-          this._update_canvas();
-        }
-      });
-
-    // 'elec_decay'        : { value : 2.0 },
-    // 'blend_factor'      : { value : 0.4 }
-
-
-    this.gui.hide_item(['Blend Factor', 'Sigma', 'Decay', 'Range Limit'], folder_name);
-  }
-
-  // 13. electrode visibility, highlight, groups
-  set_electrodes_visibility( v ){
-    if( !this._controller_electrodes ){
-      return(false);
-    }
-    if( this._ani_status ){
-      this._ani_status.setValue( false );
-    }
-
-    // render electrode colors by subjects
-    this.canvas.subject_codes.forEach((subject_code, ii) => {
-      (0,utils/* to_array */.AA)( this.canvas.electrodes.get( subject_code ) ).forEach((e) => {
-        this._electrode_visibility( e , ii , v );
-      });
-    });
-    this.canvas.state_data.set('electrode_visibility', v);
-
-    this._update_canvas();
-    this.fire_change({ 'electrode_visibility' : v });
-    return(true);
-  }
-  c_electrodes(){
-    const folder_name = constants/* CONSTANTS.FOLDERS.electrode-style */.t.FOLDERS["electrode-style"];
-    const show_inactives = this.settings.show_inactive_electrodes;
-    const vis_types = ['all visible', 'hide inactives', 'hidden'];
-    const initial_value = show_inactives? 'all visible': 'hide inactives';
-
-    this.canvas.state_data.set('electrode_visibility', initial_value);
-
-    // please check if el is electrode before dumpping into this function
-    this._electrode_visibility = (el, ii, v) => {
-      if( !(0,sphere/* is_electrode */.OK)( el ) ){
-        return(null);
-      }
-      switch (v) {
-        case 'hidden':
-          // el is invisible
-          el.visible = false;
-          break;
-        case 'hide inactives':
-          if( el.material.isMeshLambertMaterial ){
-            el.visible = false;
-          }else{
-            el.visible = true;
-          }
-          break;
-        default:
-          el.visible = true;
-      }
-    };
-
-
-    this._controller_electrodes = this.gui.add_item('Visibility', initial_value,
-      {args : vis_types, folder_name : folder_name })
-      .onChange((v) => {
-        this.set_electrodes_visibility( v );
-        this.fire_change();
-      });
-    this.gui.add_tooltip( constants/* CONSTANTS.TOOLTIPS.KEY_CYCLE_ELEC_VISIBILITY */.t.TOOLTIPS.KEY_CYCLE_ELEC_VISIBILITY, 'Visibility', folder_name);
-
-    // Add shortcuts
-    this.canvas.add_keyboard_callabck( constants/* CONSTANTS.KEY_CYCLE_ELEC_VISIBILITY */.t.KEY_CYCLE_ELEC_VISIBILITY, (evt) => {
-      if( has_meta_keys( evt.event, false, false, false ) ){
-        let current_idx = (vis_types.indexOf( this._controller_electrodes.getValue() ) + 1) % vis_types.length;
-        if( current_idx >= 0 ){
-          this._controller_electrodes.setValue( vis_types[ current_idx ] );
-        }
-      }
-    }, 'gui_c_electrodes');
-
-  }
-
-
-  // 14. electrode mapping
-  c_map_template(){
-    const folder_name = constants/* CONSTANTS.FOLDERS.electrode-mapping */.t.FOLDERS["electrode-mapping"];
-    const subject_codes = ['[no mapping]', ...this.canvas.subject_codes];
-
-    const do_mapping = this.gui.add_item('Map Electrodes', false, { folder_name : folder_name })
-      .onChange((v) => {
-        this.canvas.switch_subject( '/', { 'map_template': v });
-        if( v ){
-          this.gui.show_item(['Surface Mapping', 'Volume Mapping'], folder_name);
-        } else {
-          this.gui.hide_item(['Surface Mapping', 'Volume Mapping'], folder_name);
-        }
-        this.fire_change();
-      });
-
-    this.gui.add_item('Surface Mapping', 'std.141', {
-      args : ['std.141', 'mni305', 'no mapping'],
-      folder_name : folder_name })
-      .onChange((v) => {
-        this.canvas.switch_subject( '/', { 'map_type_surface': v });
-        this.fire_change();
-      });
-
-    this.gui.add_item('Volume Mapping', 'mni305', {
-      args : ['mni305', 'no mapping'],
-      folder_name : folder_name })
-      .onChange((v) => {
-        this.canvas.switch_subject( '/', { 'map_type_volume': v });
-        this.fire_change();
-      });
-
-    // hide mapping options
-    this.gui.hide_item(['Surface Mapping', 'Volume Mapping'], folder_name);
-
-    // need to check if this is multiple subject case
-    if( this.canvas.shared_data.get(".multiple_subjects") ){
-      // Do mapping by default
-      do_mapping.setValue( true );
-      // and open gui
-      this.gui.open_folder( folder_name );
-    }
-
-  }
-
-  // 15. animation, play/pause, speed, clips...
-  set_animation_time(v){
-    if(this._ani_time){
-      if(typeof(v) !== 'number'){
-        v = this.animation_time[0];
-      }
-      this.__current_time = v;
-      this._ani_time.setValue( v );
-    }
-  }
-  get_animation_params(){
-    if(this._ani_time && this._ani_speed && this._ani_status){
-      return({
-        play : this._ani_status.getValue(),
-        time : this.__current_time || 0, //this._ani_time.getValue(),
-        speed : this._ani_speed.getValue(),
-        min : this.animation_time[0],
-        max : this.animation_time[1],
-        display : this._ani_name.getValue(),
-        threshold : this._thres_name.getValue()
-      });
-    }else{
-      return({
-        play : false,
-        time : 0,
-        speed : 0,
-        min : 0,
-        max : 0,
-        display : '[None]',
-        threshold : '[None]'
-      });
-    }
-  }
-
-  add_clip( clip_name, focus_ui = false ){
-    if( (typeof clip_name !== 'string') || this._animation_names.includes(clip_name) ){ return; }
-    if( !this._ani_name || !this._thres_name ){ return; }
-    let el = document.createElement('option');
-    el.setAttribute('value', clip_name);
-    el.innerHTML = clip_name;
-    this._ani_name.__select.appendChild( el );
-
-    el = document.createElement('option');
-    el.setAttribute('value', clip_name);
-    el.innerHTML = clip_name;
-    this._thres_name.__select.appendChild( el );
-    this._animation_names.push( clip_name );
-
-    if( focus_ui ){
-      // This needs to be done in the next round (after dom op)
-      setTimeout(() => { this._ani_name.setValue( clip_name ); }, 100);
-    }
-
-  }
-
-  c_animation(){
-
-    // Check if animation is needed
-    if( (0,utils/* to_array */.AA)( this.settings.color_maps ).length === 0 ){
-      return(false);
-    }
-
-    // Animation is needed
-    const step = 0.001,
-          folder_name = constants/* CONSTANTS.FOLDERS.animation */.t.FOLDERS.animation;
-
-    let cnames = Object.keys( this.settings.color_maps ),
-        names = ['[None]'],
-        initial = this.settings.default_colormap;
-
-    // Make sure the initial value exists, and [None] is included in the option
-    cnames.forEach(n => {
-      if( n === 'Subject' && cnames.includes('[Subject]') ){
-        return;
-      }
-      names.push( n );
-    });
-    this._animation_names = names;
-
-    if( !initial || !names.includes( initial ) || initial.startsWith('[') ){
-      initial = undefined;
-      names.forEach((_n) => {
-        if( !initial && !_n.startsWith('[') ){
-          initial = _n;
-        }
-      });
-    }
-
-    if( !initial ){
-      initial = '[None]';
-    }
-
-
-    // Link functions to canvas (this is legacy code and I don't want to change it unless we rewrite the animation code)
-    this.canvas.animation_controls.set_time = ( v ) => {
-      this.set_animation_time( v );
-    };
-    this.canvas.animation_controls.get_params = () => { return( this.get_animation_params() ); };
-
-    // Defines when clip name is changed (variable changed)
-    const _ani_name_onchange = (v) => {
-      // Generate animations
-      this.canvas.generate_animation_clips( v, true, (cmap) => {
-
-        // update time_range
-        if( this.canvas.__min_t === undefined ) {
-          this.canvas.update_time_range();
-        }
-        this._ani_time.min( this.canvas.__min_t ).max( this.canvas.__max_t );
-        this.animation_time[0] = this.canvas.__min_t;
-        this.animation_time[1] = this.canvas.__max_t;
-
-        if( !cmap ){
-          legend_visible.setValue(false);
-          if( v === '[None]' ){
-            this.canvas.electrodes.forEach((_d) => {
-              for( let _kk in _d ){
-                _d[ _kk ].visible = true;
-              }
-            });
-          }
-        }else{
-          this.set_animation_time( this.animation_time[0] );
-          legend_visible.setValue(true);
-
-          // If inactive electrodes are hidden, re-calculate visibility
-          if( this._controller_electrodes ){
-            this.set_electrodes_visibility( this._controller_electrodes.getValue() );
-          }
-          // reset color-range
-          if( cmap.value_type === 'continuous' ){
-
-            val_range.setValue( this.__display_range_continuous || '' );
-
-            /*
-             val_range.setValue(
-               `${cmap.lut.minV.toPrecision(5)},${cmap.lut.maxV.toPrecision(5)}`
-             );
-            */
-            this.gui.show_item(['Display Range'], folder_name);
-          }else{
-            val_range.setValue(',');
-            this.gui.hide_item(['Display Range'], folder_name);
-          }
-
-        }
-        this._update_canvas();
-      });
-      this.canvas.state_data.set('display_variable', v);
-      this.fire_change({ 'clip_name' : v, 'display_data' : v });
-    };
-
-    const _thres_name_onchange = (v) => {
-      const cmap = this.canvas.color_maps.get(v);
-      if(!cmap){
-        // this is not a value we can refer to
-        thres_range.setValue('');
-        this.canvas.state_data.set('threshold_active', false);
-        return;
-      }
-
-      const previous_type = this.canvas.state_data.get('threshold_type');
-      const previous_value = this.canvas.state_data.get('threshold_type');
-
-      // set flags to canvas
-      this.canvas.state_data.set('threshold_active', true);
-      this.canvas.state_data.set('threshold_variable', v);
-
-      if(cmap.value_type === 'continuous'){
-        this.canvas.state_data.set('threshold_type', 'continuous');
-        this.gui.show_item('Threshold Method');
-
-        if( previous_type !== 'continuous' ){
-          thres_range.setValue( this.__threshold_values_continuous || '' );
-        }
-
-      }else{
-        // '' means no threshold
-        this.canvas.state_data.set('threshold_type', 'discrete');
-        thres_range.setValue(cmap.value_names.join('|'));
-        this.gui.hide_item('Threshold Method');
-      }
-    };
-
-    const ani_name = this.gui.add_item('Display Data', initial, { folder_name : folder_name, args : names })
-      .onChange((v) => {
-        _ani_name_onchange( v );
-        this.fire_change();
-        this._update_canvas();
-      });
-    this.gui.add_tooltip( constants/* CONSTANTS.TOOLTIPS.KEY_CYCLE_ANIMATION */.t.TOOLTIPS.KEY_CYCLE_ANIMATION, 'Display Data', folder_name);
-
-    this._ani_name = ani_name;
-    const val_range = this.gui.add_item('Display Range', '', { folder_name : folder_name })
-      .onChange((v) => {
-        let ss = v;
-        v = v.split(',').map(x => {
-          return( parseFloat(x) );
-        }).filter(x => {
-          return( !isNaN(x) );
-        });
-
-
-        if( v.length > 0 && !(v.length === 1 && v[0] === 0) ){
-          let v1 = v[0], v2 = Math.abs(v[0]);
-          if( v.length == 1 ){
-            v1 = -v2;
-          }else{
-            v2 = v[1];
-          }
-
-          // Set cmap value range
-          this.__display_range_continuous = ss;
-          this.canvas.switch_colormap( undefined, [v1, v2] );
-          // reset animation tracks
-
-        } else {
-          const cmap = this.canvas.switch_colormap();
-          if( cmap && cmap.value_type === 'continuous' ){
-            this.__display_range_continuous = '';
-            this.canvas.switch_colormap( undefined, [
-              cmap.value_range[0],
-              cmap.value_range[1]
-            ] );
-          }
-
-        }
-        /*
-        if( v.match(/[^0-9,-.eE~]/) ){
-          // illegal chars
-          ss = Array.from(v).map((s) => {
-            return( '0123456789.,-eE~'.indexOf(s) === -1 ? '' : s );
-          }).join('');
-        }
-        let vr = ss.split(/[,~]/);
-        if( vr.length === 2 ){
-          vr[0] = parseFloat( vr[0] );
-          vr[1] = parseFloat( vr[1] );
-        }
-
-        if( !isNaN( vr[0] ) && !isNaN( vr[1] ) ){
-          // Set cmap value range
-          this.canvas.switch_colormap( undefined, vr );
-          // reset animation tracks
-          this.canvas.generate_animation_clips( ani_name.getValue() , true );
-        }
-        */
-        this.canvas.generate_animation_clips( ani_name.getValue() , true );
-        this.fire_change();
-        this._update_canvas();
-
-      });
-
-    const thres_name = this.gui.add_item('Threshold Data', '[None]', { folder_name : folder_name, args : names })
-      .onChange((v) => {
-        _thres_name_onchange( v );
-        this.fire_change();
-        this._update_canvas();
-      });
-    this._thres_name = thres_name;
-
-    const thres_range = this.gui.add_item('Threshold Range', '', { folder_name : folder_name })
-      .onChange((v) => {
-        const is_continuous = (0,utils/* get_or_default */.jM)(this.canvas.state_data, 'threshold_type', 'discrete') == 'continuous';
-        let candidates = v.split(/[\|,]/).map((x) => { return(x.trim()); });
-
-        if(is_continuous){
-          candidates = candidates.map(x => { return(parseFloat(x)); })
-                                 .filter(x => { return(!isNaN(x)); });
-          /*
-          candidates = candidates.map((x) => {
-            let s = Array.from(x).map((s) => {
-              return( '0123456789.,-eE~'.indexOf(s) === -1 ? '' : s );
-            }).join('').split(/[,~]/);
-            if( s.length === 2 ){
-              s[0] = parseFloat( s[0] );
-              s[1] = parseFloat( s[1] );
-            }else{
-              return([]);
-            }
-            if( isNaN( s[0] ) || isNaN( s[1] ) ){
-              return([]);
-            }
-            return(s);
-          });
-          */
-          this.__threshold_values_continuous = v;
-        }
-        // set flag
-
-        this.canvas.state_data.set('threshold_values', candidates);
-        this.fire_change();
-        this._update_canvas();
-      });
-
-    const thres_method = this.gui.add_item('Threshold Method', '|v| >= T1', { folder_name : folder_name, args : constants/* CONSTANTS.THRESHOLD_OPERATORS */.t.THRESHOLD_OPERATORS })
-      .onChange((v) => {
-        const is_continuous = (0,utils/* get_or_default */.jM)(this.canvas.state_data, 'threshold_type', 'discrete') == 'continuous';
-        if( is_continuous ){
-          const op = constants/* CONSTANTS.THRESHOLD_OPERATORS.indexOf */.t.THRESHOLD_OPERATORS.indexOf(v);
-          if( op > -1 ){
-            this.canvas.state_data.set('threshold_method', op);
-            this.fire_change();
-            this._update_canvas();
-          }
-        }else{
-          // TODO: handle discrete data
-        }
-      });
-    this.canvas.state_data.set('threshold_method', 2);
-
-    this._ani_status = this.gui.add_item( 'Play/Pause', false,
-                                          { folder_name : folder_name },
-                                          constants/* CONSTANTS.TOOLTIPS.KEY_TOGGLE_ANIMATION */.t.TOOLTIPS.KEY_TOGGLE_ANIMATION );
-    this.gui.add_tooltip( constants/* CONSTANTS.TOOLTIPS.KEY_TOGGLE_ANIMATION */.t.TOOLTIPS.KEY_TOGGLE_ANIMATION, 'Play/Pause', folder_name);
-
-    this._ani_status.onChange((v) => { if(v){ this._update_canvas(2); }else{ this._update_canvas(-2); } });
-
-    this._ani_speed = this.gui.add_item('Speed', 1, {
-      args : { 'x 0.01' : 0.01, 'x 0.05' : 0.05, 'x 0.1' : 0.1, 'x 0.2': 0.2, 'x 0.5': 0.5, 'x 1': 1, 'x 2':2, 'x 5':5},
-      folder_name : folder_name
-    });
-
-    this.gui.add_item( 'Time', this.animation_time[0], { folder_name : folder_name })
-        .min(this.animation_time[0]).max(this.animation_time[1]).step(step).onChange((v) => {
-          if(typeof this.__current_time !== 'number' ||
-             Math.abs(this.__current_time - v) >= 0.001){
-            this.__current_time = v;
-          }
-          this._update_canvas();
-        });
-    this._ani_time = this.gui.get_controller('Time', folder_name);
-
-    this.canvas.bind( `dat_gui_ani_time_mousewheel`, 'mousewheel',
-      (evt) => {
-        if( evt.altKey ){
-          evt.preventDefault();
-          const current_val = this._ani_time.getValue();
-          this._ani_time.setValue( current_val + Math.sign( evt.deltaY ) * step );
-        }
-      }, this._ani_time.domElement );
-
-    // Add keyboard shortcut
-    this.canvas.add_keyboard_callabck( constants/* CONSTANTS.KEY_TOGGLE_ANIMATION */.t.KEY_TOGGLE_ANIMATION, (evt) => {
-      if( has_meta_keys( evt.event, false, false, false ) ){
-        const is_playing = this._ani_status.getValue();
-        this._ani_status.setValue( !is_playing );
-      }
-    }, 'gui_toggle_animation');
-
-    this.canvas.add_keyboard_callabck( constants/* CONSTANTS.KEY_CYCLE_ANIMATION */.t.KEY_CYCLE_ANIMATION, (evt) => {
-      if( has_meta_keys( evt.event, false, false, false ) ){
-        let current_idx = (names.indexOf( ani_name.getValue() ) + 1) % names.length;
-        if( current_idx >= 0 ){
-          ani_name.setValue( names[ current_idx ] );
-        }
-      }
-    }, 'gui_cycle_animation');
-
-
-    let render_legend = this.settings.show_legend;
-    const legend_visible = this.gui.add_item('Show Legend', true, {folder_name: folder_name })
-      .onChange((v) => {
-        this.canvas.render_legend = v;
-        this._update_canvas(0);
-        this.fire_change();
-      });
-
-    let render_timestamp = this.settings.render_timestamp || false;
-    const timestamp_visible = this.gui.add_item('Show Time', render_timestamp, {folder_name: folder_name })
-      .onChange((v) => {
-        this.canvas.render_timestamp = v;
-        this.fire_change({ 'render_timestamp' : v });
-        this._update_canvas(0);
-      });
-
-
-    this.canvas.render_legend = render_legend;
-    this.canvas.render_timestamp = render_timestamp;
-
-    this.fire_change({ 'render_timestamp' : render_timestamp });
-
-    _ani_name_onchange( initial );
-
-    this.gui.open_folder( folder_name );
-
-  }
-
-  // 16. Highlight selected electrodes and info
-  c_display_highlights(){
-    const folder_name = constants/* CONSTANTS.FOLDERS.highlight-selection */.t.FOLDERS["highlight-selection"] || 'Data Visualization';
-    this.gui.add_item('Highlight Box', true, { folder_name : folder_name })
-      .onChange((v) => {
-        this.canvas.state_data.set( 'highlight_disabled', !v );
-        this.canvas.focus_object( this.canvas.object_chosen );
-        this.fire_change();
-        this._update_canvas(0);
-      });
-
-    this.gui.add_item('Info Text', true, { folder_name : folder_name })
-      .onChange((v) => {
-        this.canvas.state_data.set( 'info_text_disabled', !v );
-        this.fire_change();
-        this._update_canvas(0);
-      });
-  }
-
-  update_voxel_type(){
-    let c, v, flag;
-
-    if( this._ctl_voxel_type_options ){
-      c = this.gui.get_controller("Voxel Type");
-      if( !c.isfake ){
-
-        let atlases = this.canvas.get_atlas_types();
-        atlases.push("none");
-        if( this._ctl_voxel_type_options.length !== atlases.length ){
-          flag = true;
-        } else {
-          flag = false;
-          this._ctl_voxel_type_options.forEach((v, ii) => {
-            if( atlases[ii] !== v ){
-              flag = true;
-            }
-          })
-        }
-        if( flag ){
-          flag = this.gui.alter_item("Voxel Type", atlases, () => {
-            this._ctl_voxel_type_options = atlases;
-          })
-        }
-      }
-    }
-  }
-
-  current_voxel_type(){
-    const atlas_type = this.canvas.state_data.get("atlas_type") || "none",
-          sub = this.canvas.state_data.get("target_subject") || "none",
-          inst = this.canvas.threebrain_instances.get(`Atlas - ${atlas_type} (${sub})`);
-    if( inst && inst.isDataCube2 ){
-      return( inst );
-    }
-    return;
-  }
-
-  c_voxel(){
-    const folder_name = constants/* CONSTANTS.FOLDERS.atlas */.t.FOLDERS.atlas || 'Volume Settings',
-          lut = this.canvas.global_data('__global_data__.VolumeColorLUT'),
-          lut_map = lut.map,
-          lut_alpha = lut.mapAlpha,
-          lut_type = lut.mapDataType;
-          // _atype = this.canvas.state_data.get( 'atlas_type' ) || 'none';  //_s
-    this._ctl_voxel_type_options = ['none'];
-    this._ctl_voxel_type_callback = (v) => {
-      if( v ){
-        if( this._current_surface_ctype !== "sync from voxels" ){
-          this.canvas.__hide_voxels = false;
-        }
-        this.canvas.switch_subject( '/', {
-          'atlas_type': v
-        });
-        this.fire_change({ 'atlas_type' : v });
-      }
-    }
-
-    this.gui.add_item('Voxel Type', 'none', {args : ['none'], folder_name : folder_name })
-      .onChange( this._ctl_voxel_type_callback );
-
-    this.fire_change({ 'atlas_type' : 'none', 'atlas_enabled' : false});
-    this.gui.add_tooltip( constants/* CONSTANTS.TOOLTIPS.KEY_CYCLE_ATLAS */.t.TOOLTIPS.KEY_CYCLE_ATLAS, 'Voxel Type', folder_name);
-
-    // register key callbacks
-    this.canvas.add_keyboard_callabck( constants/* CONSTANTS.KEY_CYCLE_ATLAS */.t.KEY_CYCLE_ATLAS, (evt) => {
-      if( has_meta_keys( evt.event, false, false, false ) ){
-        // have to update dynamically because it could change
-        const ctl = this.gui.get_controller("Voxel Type");
-        const _c = this._ctl_voxel_type_options;
-        let current_idx = (_c.indexOf( ctl.getValue() ) + 1) % _c.length;
-        if( current_idx >= 0 ){
-          ctl.setValue( _c[ current_idx ] );
-        }
-      }
-    }, 'gui_atlas_type');
-
-    // If color map supports alpha, add override option
-    const atlas_alpha = this.gui.add_item('Voxel Opacity', 0.0, { folder_name : folder_name })
-      .min(0).max(1).step(0.01)
-      .onChange((v) => {
-        const inst = this.current_voxel_type(),
-              opa = v < 0.001 ? -1 : v;
-        // mesh.material.uniforms.alpha.value = opa;
-        if( inst && inst.isDataCube2 ){
-          inst.object.material.uniforms.alpha.value = opa;
-          if( opa < 0 ){
-            inst._set_palette();
-            inst.object.material.uniforms.cmap.value.needsUpdate = true;
-          }
-        }
-        this._update_canvas();
-        this.fire_change({ 'atlas_alpha' : opa });
-      });
-
-    // this.gui.hide_item("Voxel Opacity")
-
-    //.add_item('Intersect MNI305', "NaN, NaN, NaN", {folder_name: folder_name});
-    if( lut_type === "continuous" ){
-
-      const cmap_array = Object.values(lut_map);
-      const voxel_value_range = (0,utils/* to_array */.AA)( lut.mapValueRange );
-      const voxel_minmax = (l, u) => {
-        const inst = this.current_voxel_type();
-        if( inst && inst.isDataCube2 ){
-
-          // might be large?
-          new Promise( () => {
-
-            let tmp;
-            const candidates = cmap_array.filter((e) => {
-              tmp = parseFloat(e.Label);
-              if(isNaN(tmp)){ return(false); }
-              if( tmp >= l && tmp <= u ){ return(true); }
-              return(false);
-            }).map( (e) => {
-              return(e.ColorID);
-            });
-
-            inst._set_palette( candidates );
-
-            inst.object.material.uniforms.cmap.value.needsUpdate = true;
-            this._update_canvas();
-          });
-
-        }
-      }
-      if(cmap_array.length > 0){
-        let vmin = voxel_value_range[0],
-            vmax = voxel_value_range[1];
-        this.gui.add_item('Voxel Min', vmin, { folder_name : folder_name })
-          .min(vmin).max(vmax).step((vmax - vmin) / cmap_array.length)
-          .onChange((v) => {
-            vmin = v;
-            voxel_minmax(vmin, vmax);
-          });
-
-        this.gui.add_item('Voxel Max', vmax, { folder_name : folder_name })
-          .min(vmin).max(vmax).step((vmax - vmin) / cmap_array.length)
-          .onChange((v) => {
-            vmax = v;
-            voxel_minmax(vmin, vmax);
-          });
-      }
-
-    } else {
-      const atlas_thred_text = this.gui.add_item('Voxel Label', "0", { folder_name : folder_name })
-      .onChange((v) => {
-
-        if(typeof(v) !== "string"){ return; }
-
-        const inst = this.current_voxel_type();
-        if( inst && inst.isDataCube2 ){
-
-          // might be large?
-          new Promise( () => {
-            const candidates = v.split(",")
-              .map((v) => {return parseInt(v)})
-              .filter((v) => {return !isNaN(v)});
-            inst._set_palette( candidates );
-            inst.object.material.uniforms.cmap.value.needsUpdate = true;
-            this._update_canvas();
-          });
-
-        }
-
-
-      });
-    }
-  }
-
-
-  // -------------------------- New version --------------------------
-
-
-
-
-  c_electrode_localization(folder_name = 'Electrode Localization (Beta)'){
-
-    this.canvas.electrodes.set( '__localization__', [] );
-
-    /** UI:
-     * 1. edit mode (checkbox)
-     * 2. electrode number (positive integer)
-     * 3. electrode location (string)
-     * 4. electrode label
-     * 5. Surface or Depth
-    */
-    // function to get electrode info and update dat.GUI
-    // idx is from 0 - (electrode count -1)
-    const switch_electrode = ( v ) => {
-
-      let _el = get_electrode( v );
-      if( !_el ){
-        // use default settings
-        elec_position_r.setValue( 0 );
-        elec_position_a.setValue( 0 );
-        elec_position_s.setValue( 0 );
-        // elec_label.setValue('');
-      }else{
-        elec_position_r.setValue( _el.position.x );
-        elec_position_a.setValue( _el.position.y );
-        elec_position_s.setValue( _el.position.z );
-        // elec_label.setValue( _el.userData.construct_params.custom_info || '' );
-
-        let electrode_is_surface = _el.userData.construct_params.is_surface_electrode === true;
-        elec_surface.setValue( electrode_is_surface ? 'Surface' : 'Depth' );
-
-        this.canvas.focus_object( _el );
-      }
-    };
-    const get_electrode = (el_num) => {
-      const group = this.canvas.electrodes.get('__localization__');
-      if( !group ){
-        return( undefined );
-      }
-
-      return( group[ `__localization__, ${el_num === undefined? Math.max( 1, Math.round( elec_number.getValue() ) ) : el_num} - ` ] );
-    };
-
-    const edit_mode = this.gui.add_item( 'Editing Mode', 'disabled', {
-      folder_name: folder_name,
-      args: ['disabled', 'new electrodes', 'modification']
-    } )
-      .onChange( (v) => {
-        this.canvas.edit_mode = (v !== 'disabled');
-        this.edit_mode = v;
-        this.gui.hide_item([ 'Remove Electrode', 'Number', 'Sub Label', 'Position-[R]', 'Position-[A]',
-                             'Position-[S]', 'Group Label', 'Electrode type' ], folder_name);
-        if( v === 'new electrodes' ){
-          this.gui.show_item([ 'Number', 'Electrode type' ], folder_name);
-          new_electrode();
-        }else if( v === 'modification' ){
-          this.gui.show_item([ 'Remove Electrode', 'Sub Label', 'Position-[R]', 'Position-[A]',
-                             'Position-[S]', 'Group Label' ], folder_name);
-        }
-      } );
-
-    const elec_number = this.gui.add_item( 'Number', 1, { folder_name: folder_name} ).min( 1 ).step( 1 )
-      .onChange( (v) => {
-        if( this.canvas.edit_mode ){
-          v = Math.max( Math.round( v ) , 1 );
-          switch_electrode( v );
-          this._update_canvas();
-
-          // send electrode information to shiny
-          this.shiny.loc_electrode_info( true );
-        }
-      } );
-
-    // const st = this.canvas.get_surface_types().concat( this.canvas.get_volume_types() );
-    const elec_surface = this.gui.add_item( 'Electrode type', 'Surface', {
-      folder_name: folder_name, args: ['Surface', 'Depth']
-    } ).onChange((v) => {
-      if( this.canvas.edit_mode ){
-        let el = get_electrode();
-        if( el ){
-          el.userData.construct_params.is_surface_electrode = (v === 'Surface');
-        }
-        if( v === 'Depth' ){
-          this.gui.get_controller('Overlay Coronal', 'Volume Settings').setValue( true );
-          this.gui.get_controller('Overlay Axial', 'Volume Settings').setValue( true );
-          this.gui.get_controller('Overlay Sagittal', 'Volume Settings').setValue( true );
-          this.gui.get_controller('Left Hemisphere', 'Geometry').setValue( 'hidden' );
-          this.gui.get_controller('Right Hemisphere', 'Geometry').setValue( 'hidden' );
-        }else if ( v === 'Surface' ){
-          this.gui.get_controller('Left Hemisphere', 'Geometry').setValue( 'normal' );
-          this.gui.get_controller('Right Hemisphere', 'Geometry').setValue( 'normal' );
-        }
-      }
-    });
-
-    const elec_position_r = this.gui.add_item( 'Position-[R]', 0, { folder_name: folder_name} )
-      .min(-128).max(128).step(0.01).onChange((v) => {
-        if( this.canvas.edit_mode !== true ){ return( null ); }
-        const el = get_electrode();
-        if( el ){
-          el.position.x = v;
-          el.userData.construct_params.position[0] = v;
-          el.userData.construct_params.vertex_number = -1;
-          el.userData.construct_params._distance_to_surf = -1;
-          el.userData.construct_params.hemisphere = 'NA';
-          this.shiny.loc_electrode_info( true );
-        }
-        this._update_canvas();
-      });
-    const elec_position_a = this.gui.add_item( 'Position-[A]', 0, { folder_name: folder_name} )
-      .min(-128).max(128).step(0.01).onChange((v) => {
-        if( this.canvas.edit_mode !== true ){ return( null ); }
-        const el = get_electrode();
-        if( el ){
-          el.position.y = v;
-          el.userData.construct_params.position[1] = v;
-          el.userData.construct_params.vertex_number = -1;
-          el.userData.construct_params._distance_to_surf = -1;
-          el.userData.construct_params.hemisphere = 'NA';
-          this.shiny.loc_electrode_info( true );
-        }
-        this._update_canvas();
-      });
-    const elec_position_s = this.gui.add_item( 'Position-[S]', 0, { folder_name: folder_name} )
-      .min(-128).max(128).step(0.01).onChange((v) => {
-        if( this.canvas.edit_mode !== true ){ return( null ); }
-        const el = get_electrode();
-        if( el ){
-          el.position.z = v;
-          el.userData.construct_params.position[2] = v;
-          el.userData.construct_params.vertex_number = -1;
-          el.userData.construct_params._distance_to_surf = -1;
-          el.userData.construct_params.hemisphere = 'NA';
-          this.shiny.loc_electrode_info( true );
-        }
-        this._update_canvas();
-      });
-
-
-    const elec_group_label = this.gui.add_item( 'Group Label', '', { folder_name: folder_name} )
-      .onChange((v) => {
-        elec_sub_label.setValue( 0 );
-      });
-    const elec_sub_label = this.gui.add_item( 'Sub Label', 0, { folder_name: folder_name} ).min(0).step(1);
-
-    const new_electrode = () => {
-      let next_elnum = 1;
-      (0,utils/* to_array */.AA)( this.canvas.electrodes.get("__localization__") ).forEach((el) => {
-        let el_num = el.userData.electrode_number || 1;
-        if( next_elnum <= el_num ){
-          next_elnum = el_num + 1;
-        }
-      });
-      elec_number.setValue( next_elnum );
-      this._update_canvas();
-    };
-
-    this.gui.hide_item([ 'Remove Electrode', 'Number', 'Position', 'Sub Label', 'Position-[R]',
-        'Position-[A]', 'Position-[S]', 'Group Label', 'Electrode type' ], folder_name);
-
-
-    // callback 1: focus electrode
-    this.canvas.add_mouse_callback(
-      (evt) => {
-        // If single click, focus on electrode
-        if( evt.action === 'click' && this.canvas.group.has( '__electrode_editor__' ) ){
-          return({ pass  : true, type  : this.canvas.group.get( '__electrode_editor__' ).children });
-        }
-        return({ pass: false });
-      },
-      ( res, evt ) => {
-        if( !res.target_object ){ return(null); }
-        this.canvas.focus_object( res.target_object );
-        this._update_canvas();
-
-        if( this.edit_mode === 'modification' ){
-          const _n = res.target_object.userData.electrode_number || 0;
-          if( _n > 0 ){
-            elec_number.setValue( _n );
-          }
-
-        }
-      },
-      'electrode_editor_focus'
-    );
-
-    // callback 2: double click to add electrode
-    this.canvas.add_mouse_callback(
-      (evt) => {
-        // If double click + new electrodes
-        if( evt.action === 'dblclick' && this.edit_mode === 'new electrodes' ){
-          const is_surface = elec_surface.getValue() === 'Surface',
-                current_subject = this.canvas.state_data.get("target_subject");
-          if( !current_subject ){
-            return({pass : false});
-          }
-
-          // If Surface, we only focus on the surfaces
-          let search_objects = [],
-              meta;
-          let lh_name, rh_name;
-          if( is_surface ){
-            let surfs = this.canvas.surfaces.get( current_subject );
-
-            // Check if pial-outer-smoothed is loaded
-            lh_name = `FreeSurfer Left Hemisphere - pial-outer-smoothed (${ current_subject })`;
-            rh_name = `FreeSurfer Right Hemisphere - pial-outer-smoothed (${ current_subject })`;
-            if( !surfs.hasOwnProperty( lh_name ) ){
-              lh_name = `Standard 141 Left Hemisphere - pial-outer-smoothed (${ current_subject })`;
-              rh_name = `Standard 141 Right Hemisphere - pial-outer-smoothed (${ current_subject })`;
-            }
-            if( surfs.hasOwnProperty( lh_name ) && surfs.hasOwnProperty( rh_name ) && !surfs[ lh_name ].visible ){
-              // outer pial exists
-              // Check lh and rh visibility
-              const _lh = this.gui.get_controller('Left Hemisphere');
-              if( !(_lh && _lh.getValue && _lh.getValue() === 'hidden') ){
-                surfs[ lh_name ].visible = true;
-              }
-              const _rh = this.gui.get_controller('Right Hemisphere');
-              if( !(_rh && _rh.getValue && _rh.getValue() === 'hidden') ){
-                surfs[ rh_name ].visible = true;
-              }
-              meta = {
-                lh_name: lh_name,
-                rh_name: rh_name,
-                current_subject: current_subject
-              };
-            }else{
-              lh_name = undefined;
-              rh_name = undefined;
-            }
-
-            search_objects = (0,utils/* to_array */.AA)( this.canvas.surfaces.get( current_subject ) );
-          }else{
-            search_objects = (0,utils/* to_array */.AA)(
-              (0,utils/* get_or_default */.jM)( this.canvas.volumes, current_subject, {})[`T1 (${current_subject})`]
-            );
-          }
-
-          return({
-            pass  : true,
-            type  : search_objects,
-            meta  : meta
-          });
-        }
-
-        return({ pass: false });
-      },
-      ( res, evt ) => {
-        if( res.meta && res.meta.current_subject ){
-          let surfs = this.canvas.surfaces.get( res.meta.current_subject );
-          if( res.meta.lh_name ){
-            surfs[ res.meta.lh_name ].visible = false;
-            surfs[ res.meta.rh_name ].visible = false;
-          }
-        }
-        if( res.first_item ){
-          // get current electrode
-          let current_electrode = Math.max(1, Math.round( elec_number.getValue() )),
-              // label = elec_label.getValue(),
-              label = '',
-              position = res.first_item.point.toArray(),
-              is_surface_electrode = elec_surface.getValue() === 'Surface';
-
-          const surface_type = (0,utils/* get_or_default */.jM)( this.canvas.state_data, 'surface_type', 'pial');
-          (0,sphere/* add_electrode */.C6)(this.canvas, current_electrode, `__localization__, ${current_electrode} - ` ,
-                                position, surface_type, label, is_surface_electrode, 1);
-
-          new_electrode();
-        }
-        this.shiny.loc_electrode_info();
-        this._update_canvas();
-      },
-      'electrode_editor_add_electrodes'
-    );
-
-    // callback 3: double click to add label
-    this.canvas.add_mouse_callback(
-      (evt) => {
-        if( evt.action === 'dblclick' &&
-            this.edit_mode === 'modification' &&
-            this.canvas.group.has( '__electrode_editor__' ) )
-        {
-          return({ pass  : true, type : this.canvas.group.get( '__electrode_editor__' ).children });
-        }
-        // Default, do nothing
-        return({ pass: false });
-      },
-      ( res, evt ) => {
-        if( !res.target_object ){ return(null); }
-        const group_label = elec_group_label.getValue();
-        const sub_number = elec_sub_label.getValue() + 1;
-
-        res.target_object.userData.construct_params.custom_info = group_label + sub_number;
-
-        elec_sub_label.setValue( sub_number );
-        this.shiny.loc_electrode_info();
-        this._update_canvas();
-      },
-      'electrode_editor_labels'
-    );
-
-    this.canvas.add_keyboard_callabck( constants/* CONSTANTS.KEY_CYCLE_REMOVE_EDITOR */.t.KEY_CYCLE_REMOVE_EDITOR, (evt) => {
-      if( this.canvas.edit_mode && has_meta_keys( evt.event, true, false, false ) ){
-        const el = get_electrode();
-        if( el && el.userData.construct_params.is_electrode ){
-          el.parent.remove( el );
-          const group = this.canvas.electrodes.get('__localization__');
-          delete group[ el.userData.construct_params.name ];
-          this.shiny.loc_electrode_info();
-          this._update_canvas();
-        }
-      }
-    });
-
-
-    this.canvas.add_keyboard_callabck( constants/* CONSTANTS.KEY_CYCLE_ELEC_EDITOR */.t.KEY_CYCLE_ELEC_EDITOR, (evt) => {
-      if( this.canvas.edit_mode ){
-        let delta = -1;
-        if( has_meta_keys( evt.event, true, false, false ) ){
-          delta = 1;
-        }
-        // last
-        let el_num = Math.round( elec_number.getValue() + delta );
-        el_num = Math.max( 1, el_num );
-        elec_number.setValue( el_num );
-        this._update_canvas();
-      }
-    }, 'edit-gui_cycle_electrodes');
-
-
-    this.canvas.add_keyboard_callabck( constants/* CONSTANTS.KEY_CYCLE_SURFTYPE_EDITOR */.t.KEY_CYCLE_SURFTYPE_EDITOR, (evt) => {
-      if( this.canvas.edit_mode ){
-        const is_ecog = elec_surface.getValue() === 'Surface';
-        elec_surface.setValue( is_ecog ? 'Depth' : 'Surface' );
-        this._update_canvas();
-      }
-    }, 'edit-gui_cycle_surftype');
-
-    this.canvas.add_keyboard_callabck( constants/* CONSTANTS.KEY_NEW_ELECTRODE_EDITOR */.t.KEY_NEW_ELECTRODE_EDITOR, (evt) => {
-      if( this.canvas.edit_mode ){
-        new_electrode();
-      }
-    }, 'edit-gui_new_electrodes');
-/*
-    this.canvas.add_keyboard_callabck( CONSTANTS.KEY_LABEL_FOCUS_EDITOR, (evt) => {
-      if( this.canvas.edit_mode ){
-        elec_label.domElement.children[0].click();
-      }
-    }, 'edit-gui_edit_label');*/
-
-    // close other folders
-    this.gui.folders["Default"].close();
-    this.gui.folders["Volume Settings"].close();
-    this.gui.folders[ folder_name ].open();
-
-    // hide 3 planes
-    edit_mode.setValue( 'new electrodes' );
-
-    this._has_localization = true;
-
-  }
-
-  c_export_electrodes(folder_name = 'Default'){
-    this.gui.add_item('Download Electrodes', () => {
-      this.canvas.download_electrodes('csv');
-    });
-  }
-
-  c_ct_visibility(){
-    const folder_name = 'CT Overlay';
-    this.gui.add_item('Align CT to T1', false, { folder_name: folder_name })
-      .onChange((v) => {
-        this.canvas._show_ct = v;
-        this.canvas.switch_subject();
-      });
-    const ct_thred = this.gui.add_item('CT threshold', 0.8, { folder_name: folder_name })
-      .min(0.3).max(1).step(0.01)
-      .onChange((v) => {
-        this.canvas.switch_subject('/', { ct_threshold : v });
-      });
-
-    const n_elec = this.gui.add_item('Number of Elecs', 100, { folder_name: folder_name })
-      .min(1).step(1);
-    this.gui.add_item('Guess Electrodes', () => {
-      const thred = ct_thred.getValue() * 255;
-      const n_electrodes = Math.ceil(n_elec.getValue());
-      const current_subject = this.canvas.state_data.get("target_subject") || '';
-      const ct_cube = this.canvas.mesh.get(`ct.aligned.t1 (${current_subject})`);
-      if( !ct_cube || ct_cube.userData.construct_params.type !== 'datacube2' ){
-        alert(`Cannot find aligned CT (${current_subject})`);
-        return(null);
-      }
-
-      this.shiny.to_shiny({
-        threshold: thred,
-        current_subject : current_subject,
-        n_electrodes : n_electrodes
-      }, 'ct_threshold', true);
-
-      /*
-
-
-      const dset = ct_cube.material.uniforms.u_data.value.image,
-            dat = dset.data,
-            _w = dset.width,
-            _h = dset.height,
-            _d = dset.depth;
-
-      // Get data
-      let xyz = [];
-      for(let _z = 0; _z < _d; _z++ ){
-        for(let _y = 0; _y < _h; _y++ ){
-          for(let _x = 0; _x < _w; _x++ ){
-            if( dat[_x + _w * (_y + _h * _z)] >= thred ){
-              xyz.push( [ _x, _y, _z ] );
-            }
-          }
-        }
-      }
-      window.xyz = xyz;
-      */
-
-
-    }, { folder_name: folder_name });
-
-
-    this.gui.folders[ folder_name ].open();
-
-  }
-
-}
-
+;// CONCATENATED MODULE: ./src/js/core/gui_wrapper.js
 
 
 
@@ -56619,7 +57077,8 @@ class THREEBRAIN_CONTROL{
       "Display Range", "Threshold Data", "Threshold Range", "Threshold Method",
       "Show Legend", "Show Time", "Highlight Box", "Info Text",
       "Voxel Type", "Voxel Label", "Voxel Opacity", 'Voxel Min', 'Voxel Max',
-      'Surface Color', 'Blend Factor', 'Sigma', 'Decay', 'Range Limit'
+      'Surface Color', 'Blend Factor', 'Sigma', 'Decay', 'Range Limit',
+      'Edit Mode'
     ];
     const args_dict = (0,utils/* to_dict */.nr)( args );
 
@@ -56769,11 +57228,6 @@ class THREEBRAIN_CONTROL{
 
 
 
-
-
-
-//window.THREEBRAIN_PRESETS = THREEBRAIN_PRESETS;
-//window.THREEBRAIN_CONTROL = THREEBRAIN_CONTROL;
 
 
 /***/ }),
@@ -57070,8 +57524,9 @@ class AbstractThreeBrainObject {
 /* harmony export */   "C6": () => (/* binding */ add_electrode),
 /* harmony export */   "OK": () => (/* binding */ is_electrode)
 /* harmony export */ });
+/* unused harmony export add_electrode2 */
 /* harmony import */ var _abstract_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(470);
-/* harmony import */ var _threeplugins_js__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(178);
+/* harmony import */ var _threeplugins_js__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(1829);
 /* harmony import */ var _utils_js__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(3658);
 /* harmony import */ var _constants_js__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(975);
 
@@ -57464,7 +57919,31 @@ class Sphere extends _abstract_js__WEBPACK_IMPORTED_MODULE_0__/* .AbstractThreeB
 
 
 function gen_sphere(g, canvas){
-  return( new Sphere(g, canvas) );
+  const subject_code = g.subject_code;
+
+  if( subject_code ){
+    // make sure subject group exists
+    if( g.group && g.group.group_name ){
+      const group_name = g.group.group_name;
+
+      if( !canvas.group.has(group_name) ){
+        canvas.add_group( {
+          name : group_name, layer : 0, position : [0,0,0],
+          disable_trans_mat: true, group_data: null,
+          parent_group: null, subject_code: subject_code,
+          trans_mat: null
+        });
+      }
+    }
+  }
+
+  const el = new Sphere(g, canvas);
+
+  if( subject_code ){
+    // make sure subject array exists
+    canvas.init_subject( subject_code );
+  }
+  return( el );
 }
 
 function add_electrode (canvas, number, name, position, surface_type = 'NA',
@@ -57593,6 +58072,38 @@ function add_electrode (canvas, number, name, position, surface_type = 'NA',
   return( _el );
 }
 
+
+function add_electrode2 (g, canvas){
+  const subject_code = g.subject_code;
+
+  if( !subject_code ){
+    throw Error("No subject code in `add_electrode2`");
+  }
+
+  if( g.group && g.group.group_name ){
+    const group_name = g.group.group_name;
+
+    if( !canvas.group.has(group_name) ){
+      canvas.add_group( {
+        name : group_name, layer : 0, position : [0,0,0],
+        disable_trans_mat: true, group_data: null,
+        parent_group: null, subject_code: subject_code,
+        trans_mat: null
+      });
+    }
+  }
+  const el = gen_sphere(g, canvas);
+
+  if( !el || typeof(el) !== 'object' || !el.object ){
+    return;
+  }
+
+  // make sure subject array exists
+  canvas.init_subject( subject_code );
+  el.finish_init();
+  return( el );
+}
+
 function is_electrode(e) {
   if(e && e.isMesh && e.userData.construct_params && e.userData.construct_params.is_electrode){
     return(true);
@@ -57614,7 +58125,7 @@ function is_electrode(e) {
 /* harmony export */   "P": () => (/* binding */ THREE_BRAIN_SHINY)
 /* harmony export */ });
 /* harmony import */ var _utils_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(3658);
-/* harmony import */ var _threeplugins_js__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(178);
+/* harmony import */ var _threeplugins_js__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(1829);
 /* harmony import */ var _geometry_sphere_js__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(960);
 /* harmony import */ var _constants_js__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(975);
 /* JS to shiny callbacks
@@ -60824,8 +61335,8 @@ Stats.Panel = function ( name, fg, bg ) {
 
 
 
-// EXTERNAL MODULE: ./src/js/threeplugins.js + 5 modules
-var threeplugins = __webpack_require__(178);
+// EXTERNAL MODULE: ./src/js/threeplugins.js + 6 modules
+var threeplugins = __webpack_require__(1829);
 // EXTERNAL MODULE: ./src/js/threebrain_cache.js
 var threebrain_cache = __webpack_require__(5664);
 ;// CONCATENATED MODULE: ./src/js/libs/draggable.js
@@ -61575,7 +62086,7 @@ class DataCube2 extends geometry_abstract/* AbstractThreeBrainObject */.j {
           lut = canvas.global_data('__global_data__.VolumeColorLUT'),
           lut_map = lut.map,
           max_colID = lut.mapMaxColorID;
-
+    this._margin_length = volume;
     // If webgl2 is enabled, then we can show 3d texture, otherwise we can only show 3D plane
     if( canvas.has_webgl2 ){
       // Generate 3D texture, to do so, we need to customize shaders
@@ -62979,6 +63490,7 @@ class THREEBRAIN_CANVAS {
     // DOM container information
     this.el = el;
     this.container_id = this.el.getAttribute( 'data-target' );
+    this.ready = false;
 
     // Is system supporting WebGL2? some customized shaders might need this feature
     // As of 08-2019, only chrome, firefox, and opera support full implementation of WebGL.
@@ -63026,6 +63538,10 @@ class THREEBRAIN_CANVAS {
     // Dispatcher of handlers when mouse is clicked on the main canvas
     this._mouse_click_callbacks = {};
     this._keyboard_callbacks = {};
+
+    // update functions
+    this._custom_updates = new Map();
+    this._update_countdown = 5;
 
     /* A render flag that tells renderers whether the canvas needs update.
           Case -1, -2, ... ( < 0 ) : stop rendering
@@ -64043,11 +64559,15 @@ class THREEBRAIN_CANVAS {
     }
   }
 
+  set_raycaster(){
+    this.mouse_raycaster.setFromCamera( this.mouse_pointer, this.main_camera );
+  }
+
   _fast_raycast( request_type ){
 
     let items;
 
-    this.mouse_raycaster.setFromCamera( this.mouse_pointer, this.main_camera );
+    this.set_raycaster();
 
     this.mouse_raycaster.layers.disableAll();
 
@@ -64503,6 +65023,26 @@ class THREEBRAIN_CANVAS {
     } catch (e) {
       if(this.DEBUG){
         console.error(e);
+      }
+    }
+
+    // Run less frequently
+    if( this.ready && this._custom_updates.size ){
+      if( this._update_countdown > 0 ){
+        this._update_countdown--;
+      } else {
+        this._update_countdown = 5;
+        this._custom_updates.forEach((f) => {
+          try {
+            if( typeof(f) === "function" ){
+              f();
+            }
+          } catch (e) {
+            if(this.DEBUG){
+              console.error(e);
+            }
+          }
+        });
       }
     }
 
@@ -65383,7 +65923,11 @@ class THREEBRAIN_CANVAS {
   dispose(){
     // Remove all objects, listeners, and dispose all
     this._disposed = true;
+    this.ready = false;
     this.clock.stop();
+
+    // update functions
+    this._custom_updates.clear();
 
     // Remove custom listeners
     this.dispose_eventlisters();
@@ -65507,20 +66051,22 @@ class THREEBRAIN_CANVAS {
       console.debug('Generating geometry '+g.type);
     }
     let gen_f = GEOMETRY_FACTORY[g.type],
-        inst = gen_f(g, this),
-        layers = (0,utils/* to_array */.AA)(g.layer);
+        inst = gen_f(g, this);
 
-    if(typeof(inst) !== 'object' || inst === null){
-      return(null);
-    }
-
-    if( !inst.object ){
-      return(null);
+    if( !inst || typeof(inst) !== 'object' || !inst.object ){
+      return;
     }
 
     // make sure subject array exists
-    const subject_code = inst.subject_code;
+    this.init_subject( inst.subject_code );
 
+
+    inst.finish_init();
+    return( inst );
+  }
+
+  init_subject( subject_code ){
+    if( !subject_code ){ return; }
     if( ! this.subject_codes.includes( subject_code ) ){
       this.subject_codes.push( subject_code );
       this.electrodes.set( subject_code, {});
@@ -65529,9 +66075,6 @@ class THREEBRAIN_CANVAS {
       this.surfaces.set(subject_code, {} );
       this.atlases.set( subject_code, {} );
     }
-
-
-    inst.finish_init();
   }
 
   add_clickable( name, obj ){
@@ -65794,6 +66337,46 @@ class THREEBRAIN_CANVAS {
       for( let _n in g.group_data ){
         this.shared_data.set(_n.substring(15), g.group_data[ _n ]);
       }
+
+      // check if ".subject_codes" is in the name
+      const subject_codes = (0,utils/* to_array */.AA)( this.shared_data.get(".subject_codes") );
+      if( subject_codes.length > 0 ){
+
+        // generate transform matrices
+        subject_codes.forEach((scode) => {
+
+          let subject_data = this.shared_data.get(scode);
+          if( !subject_data ){
+            subject_data = {};
+            this.shared_data.set(scode, subject_data);
+          }
+
+          const Norig = threeplugins/* THREE.as_Matrix4 */.J.as_Matrix4( subject_data.Norig );
+          const Torig = threeplugins/* THREE.as_Matrix4 */.J.as_Matrix4( subject_data.Torig );
+          const xfm = threeplugins/* THREE.as_Matrix4 */.J.as_Matrix4( subject_data.xfm );
+          const tkrRAS_MNI305 = threeplugins/* THREE.as_Matrix4 */.J.as_Matrix4( subject_data.vox2vox_MNI305 );
+          const MNI305_tkrRAS = new threeplugins/* THREE.Matrix4 */.J.Matrix4()
+            .copy(tkrRAS_MNI305).invert();
+          const tkrRAS_Scanner = new threeplugins/* THREE.Matrix4 */.J.Matrix4()
+            .copy(Norig)
+            .multiply(
+              new threeplugins/* THREE.Matrix4 */.J.Matrix4()
+                .copy(Torig)
+                .invert()
+            );
+          subject_data.matrices = {
+            Norig : Norig,
+            Torig : Torig,
+            xfm : xfm,
+            tkrRAS_MNI305 : tkrRAS_MNI305,
+            MNI305_tkrRAS : MNI305_tkrRAS,
+            tkrRAS_Scanner: tkrRAS_Scanner
+          };
+
+        });
+
+      }
+
     }
 
     const check = function(){
@@ -66033,6 +66616,7 @@ class THREEBRAIN_CANVAS {
     return( (0,utils/* to_array */.AA)( re ) );
   }
 
+  // not used
   get_volume_types(){
     const re = {};
 
@@ -66114,21 +66698,17 @@ class THREEBRAIN_CANVAS {
     let map_type_volume = args.map_type_volume || state.get( 'map_type_volume' ) || 'mni305';
     let surface_opacity_left = args.surface_opacity_left || state.get( 'surface_opacity_left' ) || 1;
     let surface_opacity_right = args.surface_opacity_right || state.get( 'surface_opacity_right' ) || 1;
-    let v2v_orig = (0,utils/* get_or_default */.jM)( this.shared_data, target_subject, {} ).vox2vox_MNI305;
-    // let v2v_orig = this.shared_data.get( target_subject ).vox2vox_MNI305;
+
+    // TODO: add checks
+    const subject_data  = this.shared_data.get( target_subject );
+
+    // tkRAS should be tkrRAS, TODO: fix this typo
+    const tkRAS_MNI305 = subject_data.matrices.tkrRAS_MNI305;
+    const MNI305_tkRAS = subject_data.matrices.MNI305_tkrRAS;
+
     let anterior_commissure = state.get('anterior_commissure') || new threeplugins/* THREE.Vector3 */.J.Vector3();
     anterior_commissure.set(0,0,0);
-
-    let tkRAS_MNI305 = state.get('tkRAS_MNI305') || new threeplugins/* THREE.Matrix4 */.J.Matrix4();
-    tkRAS_MNI305.set(1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1);
-    if(Array.isArray(v2v_orig) && v2v_orig.length == 4 && v2v_orig[3].length == 4 ){
-      tkRAS_MNI305.set( v2v_orig[0][0], v2v_orig[0][1], v2v_orig[0][2], v2v_orig[0][3],
-        v2v_orig[1][0], v2v_orig[1][1], v2v_orig[1][2], v2v_orig[1][3],
-        v2v_orig[2][0], v2v_orig[2][1], v2v_orig[2][2], v2v_orig[2][3],
-        v2v_orig[3][0], v2v_orig[3][1], v2v_orig[3][2], v2v_orig[3][3] );
-      const MNI305_tkRAS = new threeplugins/* THREE.Matrix4 */.J.Matrix4().copy( tkRAS_MNI305 ).invert();
-      anterior_commissure.setFromMatrixPosition( MNI305_tkRAS );
-    }
+    anterior_commissure.setFromMatrixPosition( MNI305_tkRAS );
 
     this.switch_volume( target_subject, volume_type );
     this.switch_ct( target_subject, ct_type, ct_threshold );
@@ -66319,9 +66899,9 @@ mapped = false,
 
 
     const pos_targ = new threeplugins/* THREE.Vector3 */.J.Vector3(),
-          pos_orig = new threeplugins/* THREE.Vector3 */.J.Vector3(),
-          mat1 = new threeplugins/* THREE.Matrix4 */.J.Matrix4(),
-          mat2 = new threeplugins/* THREE.Matrix4 */.J.Matrix4();
+          pos_orig = new threeplugins/* THREE.Vector3 */.J.Vector3();
+          // mat1 = new THREE.Matrix4(),
+          // mat2 = new THREE.Matrix4();
 
     this.electrodes.forEach( (els, origin_subject) => {
       for( let el_name in els ){
@@ -66346,16 +66926,10 @@ mapped = false,
           ) {
             el.userData.MNI305_position.fromArray( mni305 );
           } else {
-            let v2v_orig = (0,utils/* get_or_default */.jM)( this.shared_data, origin_subject, {} ).vox2vox_MNI305;
-            if( v2v_orig ){
-              mat1.set( v2v_orig[0][0], v2v_orig[0][1], v2v_orig[0][2], v2v_orig[0][3],
-                                    v2v_orig[1][0], v2v_orig[1][1], v2v_orig[1][2], v2v_orig[1][3],
-                                    v2v_orig[2][0], v2v_orig[2][1], v2v_orig[2][2], v2v_orig[2][3],
-                                    v2v_orig[3][0], v2v_orig[3][1], v2v_orig[3][2], v2v_orig[3][3] );
-              pos_targ.fromArray( origin_position ).applyMatrix4(mat1);
-              el.userData.MNI305_position.fromArray( pos_targ.toArray() );
-            }
-
+            const subject_data  = this.shared_data.get( origin_subject );
+            const tkrRAS_MNI305 = subject_data.matrices.tkrRAS_MNI305;
+            pos_targ.fromArray( origin_position ).applyMatrix4( tkrRAS_MNI305 );
+            el.userData.MNI305_position.copy( pos_targ );
           }
         }
 
@@ -66369,48 +66943,24 @@ mapped = false,
         // always do MNI305 mapping first as calibration
         if( !hide_electrode && volume === 'mni305' ){
           // apply MNI 305 transformation
-          // let v2v_orig = get_or_default( this.shared_data, origin_subject, {} ).vox2vox_MNI305;
-          const v2v_targ = (0,utils/* get_or_default */.jM)( this.shared_data, target_subject, {} ).vox2vox_MNI305;
+          const subject_data2  = this.shared_data.get( target_subject );
+          const MNI305_tkrRAS = subject_data2.matrices.MNI305_tkrRAS;
 
-          if( v2v_targ ){
-            mat2.set( v2v_targ[0][0], v2v_targ[0][1], v2v_targ[0][2], v2v_targ[0][3],
-                      v2v_targ[1][0], v2v_targ[1][1], v2v_targ[1][2], v2v_targ[1][3],
-                      v2v_targ[2][0], v2v_targ[2][1], v2v_targ[2][2], v2v_targ[2][3],
-                      v2v_targ[3][0], v2v_targ[3][1], v2v_targ[3][2], v2v_targ[3][3] );
+          if( mni305_points.x !== 0 || mni305_points.y !== 0 || mni305_points.z !== 0 ){
+            pos_targ.set( mni305_points.x, mni305_points.y, mni305_points.z ).applyMatrix4(MNI305_tkrRAS);
+            mapped = true;
+          }
 
-            // mat2.getInverse( mat2 );
-            mat2.invert();
-
-            if( mni305_points.x !== 0 || mni305_points.y !== 0 || mni305_points.z !== 0 ){
-              pos_targ.set( mni305_points.x, mni305_points.y, mni305_points.z ).applyMatrix4(mat2);
-              mapped = true;
-            }
-            /*
-            if( !mapped && v2v_orig ){
-              mat1.set( v2v_orig[0][0], v2v_orig[0][1], v2v_orig[0][2], v2v_orig[0][3],
-                        v2v_orig[1][0], v2v_orig[1][1], v2v_orig[1][2], v2v_orig[1][3],
-                        v2v_orig[2][0], v2v_orig[2][1], v2v_orig[2][2], v2v_orig[2][3],
-                        v2v_orig[3][0], v2v_orig[3][1], v2v_orig[3][2], v2v_orig[3][3] );
-
-              // target position = inv(mat2) * mat1 * origin_position
-              // mat2.multiplyMatrices( mat2, mat1 );
-              pos_targ.fromArray( origin_position ).applyMatrix4(mat1);
-
-              pos_targ.applyMatrix4( mat2 );
-              mapped = true;
-            }*/
-
-            if( mapped ){
-              el.position.copy( pos_targ );
-              el.userData._template_mni305 = pos_targ.clone();
-              el.userData._template_mapped = true;
-              el.userData._template_space = 'mni305';
-              el.userData._template_shift = 0;
-              el.userData._template_surface = g.surface_type;
-              el.userData._template_hemisphere = g.hemisphere;
-            }else{
-              el.userData._template_mni305 = undefined;
-            }
+          if( mapped ){
+            el.position.copy( pos_targ );
+            el.userData._template_mni305 = pos_targ.clone();
+            el.userData._template_mapped = true;
+            el.userData._template_space = 'mni305';
+            el.userData._template_shift = 0;
+            el.userData._template_surface = g.surface_type;
+            el.userData._template_hemisphere = g.hemisphere;
+          }else{
+            el.userData._template_mni305 = undefined;
           }
 
         }
@@ -66469,35 +67019,30 @@ mapped = false,
   // export electrodes
   electrodes_info(){
 
-    const res = {};
+    const res = [];
 
-    // Electrode Coord_x Coord_y Coord_z Label MNI305_x MNI305_y MNI305_z
-    // SurfaceElectrode SurfaceType Radius VertexNumber
     this.electrodes.forEach( ( collection , subject_code ) => {
       const _regexp = new RegExp(`^${subject_code}, ([0-9]+) \\- (.*)$`),
             // _regexp = CONSTANTS.REGEXP_ELECTRODE,
-            _v2v = (0,utils/* get_or_default */.jM)( this.shared_data, subject_code, {} ).vox2vox_MNI305,
-            re = [],
-            mat = new threeplugins/* THREE.Matrix4 */.J.Matrix4(),
+            subject_data  = this.shared_data.get( subject_code ),
+            tkrRAS_Scanner = subject_data.matrices.tkrRAS_Scanner,
+            xfm = subject_data.matrices.xfm,
             pos = new threeplugins/* THREE.Vector3 */.J.Vector3();
       let row = {};
       let parsed, e, g;
-
-      if( _v2v ){
-        mat.set( _v2v[0][0], _v2v[0][1], _v2v[0][2], _v2v[0][3],
-                 _v2v[1][0], _v2v[1][1], _v2v[1][2], _v2v[1][3],
-                 _v2v[2][0], _v2v[2][1], _v2v[2][2], _v2v[2][3],
-                 _v2v[3][0], _v2v[3][1], _v2v[3][2], _v2v[3][3] );
-
-      }
 
       for( let k in collection ){
         parsed = _regexp.exec( k );
         // just incase
         if( parsed && parsed.length === 3 ){
-          row = {};
+          row = { Subject : subject_code };
           e = collection[ k ];
           g = e.userData.construct_params;
+
+          if( e.userData.instance._enabled === false ){
+            continue;
+          }
+
           pos.fromArray( g.position );
 
           // Electrode Coord_x Coord_y Coord_z Label Hemisphere
@@ -66507,8 +67052,14 @@ mapped = false,
           row.Coord_z = pos.z;
           row.Label = parsed[2];
 
+          //  T1_x y z
+          pos.applyMatrix4( tkrRAS_Scanner );
+          row.T1_x = pos.x;
+          row.T1_y = pos.y;
+          row.T1_z = pos.z;
+
           //  MNI305_x MNI305_y MNI305_z
-          pos.applyMatrix4( mat );
+          pos.applyMatrix4( xfm );
           row.MNI305_x = pos.x;
           row.MNI305_y = pos.y;
           row.MNI305_z = pos.z;
@@ -66523,37 +67074,11 @@ mapped = false,
           // CustomizedInformation
           row.Notes = g.custom_info || '';
 
+          res.push( row );
         }
-        re[ row.Electrode - 1 ] = row;
-      }
-      row = {};
-      // re set row to default
-      row.Coord_x = 0;
-      row.Coord_y = 0;
-      row.Coord_z = 0;
-      row.Label = 'NA';
 
-      //  MNI305_x MNI305_y MNI305_z
-      row.MNI305_x = 0;
-      row.MNI305_y = 0;
-      row.MNI305_z = 0;
-
-      // SurfaceElectrode SurfaceType Radius VertexNumber
-      row.SurfaceElectrode = 'TRUE';
-      row.SurfaceType = 'NA';
-      row.Radius = 1;
-      row.VertexNumber = -1;
-      row.Hemisphere = 'NA';
-      row.Notes = '';
-      for( let ii = 0; ii < re.length; ii++ ){
-        if( re[ ii ] === undefined ){
-          // missing one electrode, fill that in
-          row.Electrode = ii + 1;
-          re[ ii ] = {...row};
-        }
       }
 
-      res[ subject_code ] = re;
     });
 
     return( res );
@@ -66562,40 +67087,22 @@ mapped = false,
   download_electrodes( format = 'json' ){
     const res = this.electrodes_info();
 
-
-    // convert to csv
-    for( let subcode in res ){
-      let electrode_data = res[ subcode ];
-
-      if( subcode === '__localization__' ){
-        const template_sub = this.state_data.get('target_subject');
-        electrode_data = electrode_data.map((e) => {
-
-          return({
-            Electrode : e.Electrode,
-            TemplateCoord_x : e.Coord_x,
-            TemplateCoord_y : e.Coord_y,
-            TemplateCoord_z : e.Coord_z,
-            Label : e.Notes,
-            TemplateSubject : template_sub
-          });
-
-        });
-
-      }
-
-      if( electrode_data.length > 0 ){
-        if( format === 'json' ){
-          download_default()( JSON.stringify(electrode_data) , subcode + '_electrodes.json', 'application/json');
-        }else if( format === 'csv' ){
-          (0,converter.json2csv)(electrode_data, (err, csv) => {
-            download_default()( csv , subcode + '_electrodes.csv', 'plan/csv');
-          });
-        }
-
-      }
+    if( res.length == 0 ){
+      alert("No electrode found!");
+      return;
     }
 
+    if( format === 'json' ){
+      download_default()(
+        JSON.stringify(res) ,
+        'electrodes.json',
+        'application/json'
+      );
+    }else if( format === 'csv' ){
+      (0,converter.json2csv)(res, (err, csv) => {
+        download_default()( csv , 'electrodes.csv', 'plan/csv');
+      });
+    }
 
   }
 
@@ -66651,7 +67158,7 @@ mapped = false,
 
 /***/ }),
 
-/***/ 178:
+/***/ 1829:
 /***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
 
 "use strict";
@@ -67178,7 +67685,7 @@ const register_lut = function(THREE){
 
 
 
-;// CONCATENATED MODULE: ./src/js/controls/OrthographicTrackballControls.js
+;// CONCATENATED MODULE: ./src/js/core/OrthographicTrackballControls.js
 /**
  * @author Eberhard Graether / http://egraether.com/
  * @author Mark Lundin 	/ http://mark-lundin.com
@@ -68313,6 +68820,1341 @@ function add_text_sprite(THREE){
 
 
 
+;// CONCATENATED MODULE: ./src/js/ext/geometries/ConvexHull.js
+function regisater_convexhull(THREE) {
+  const Visible = 0;
+  const Deleted = 1;
+
+  const _v1 = new THREE.Vector3();
+  const _Line3 = new THREE.Line3();
+  const _Plane = new THREE.Plane();
+  const _closestPoint = new THREE.Vector3();
+  const _Triangle = new THREE.Triangle();
+
+  class ConvexHull {
+
+  	constructor() {
+
+  		this.tolerance = - 1;
+
+  		this.faces = []; // the generated faces of the convex hull
+  		this.newFaces = []; // this array holds the faces that are generated within a single iteration
+
+  		// the vertex lists work as follows:
+  		//
+  		// let 'a' and 'b' be 'Face' instances
+  		// let 'v' be points wrapped as instance of 'Vertex'
+  		//
+  		//     [v, v, ..., v, v, v, ...]
+  		//      ^             ^
+  		//      |             |
+  		//  a.outside     b.outside
+  		//
+  		this.assigned = new VertexList();
+  		this.unassigned = new VertexList();
+
+  		this.vertices = []; 	// vertices of the hull (internal representation of given geometry data)
+
+  	}
+
+  	setFromPoints( points ) {
+
+  		if ( Array.isArray( points ) !== true ) {
+
+  			console.error( 'THREE.ConvexHull: Points parameter is not an array.' );
+
+  		}
+
+  		if ( points.length < 4 ) {
+
+  			console.error( 'THREE.ConvexHull: The algorithm needs at least four points.' );
+
+  		}
+
+  		this.makeEmpty();
+
+  		for ( let i = 0, l = points.length; i < l; i ++ ) {
+
+  			this.vertices.push( new VertexNode( points[ i ] ) );
+
+  		}
+
+  		this.compute();
+
+  		return this;
+
+  	}
+
+  	setFromObject( object ) {
+
+  		const points = [];
+
+  		object.updateMatrixWorld( true );
+
+  		object.traverse( function ( node ) {
+
+  			const geometry = node.geometry;
+
+  			if ( geometry !== undefined ) {
+
+  				if ( geometry.isGeometry ) {
+
+  					console.error( 'THREE.ConvexHull no longer supports Geometry. Use THREE.BufferGeometry instead.' );
+  					return;
+
+  				} else if ( geometry.isBufferGeometry ) {
+
+  					const attribute = geometry.attributes.position;
+
+  					if ( attribute !== undefined ) {
+
+  						for ( let i = 0, l = attribute.count; i < l; i ++ ) {
+
+  							const point = new THREE.Vector3();
+
+  							point.fromBufferAttribute( attribute, i ).applyMatrix4( node.matrixWorld );
+
+  							points.push( point );
+
+  						}
+
+  					}
+
+  				}
+
+  			}
+
+  		} );
+
+  		return this.setFromPoints( points );
+
+  	}
+
+  	containsPoint( point ) {
+
+  		const faces = this.faces;
+
+  		for ( let i = 0, l = faces.length; i < l; i ++ ) {
+
+  			const face = faces[ i ];
+
+  			// compute signed distance and check on what half space the point lies
+
+  			if ( face.distanceToPoint( point ) > this.tolerance ) return false;
+
+  		}
+
+  		return true;
+
+  	}
+
+  	intersectRay( ray, target ) {
+
+  		// based on "Fast Ray-Convex Polyhedron Intersection"  by Eric Haines, GRAPHICS GEMS II
+
+  		const faces = this.faces;
+
+  		let tNear = - Infinity;
+  		let tFar = Infinity;
+
+  		for ( let i = 0, l = faces.length; i < l; i ++ ) {
+
+  			const face = faces[ i ];
+
+  			// interpret faces as THREE.Planes for the further computation
+
+  			const vN = face.distanceToPoint( ray.origin );
+  			const vD = face.normal.dot( ray.direction );
+
+  			// if the origin is on the positive side of a THREE.Plane (so the THREE.Plane can "see" the origin) and
+  			// the ray is turned away or parallel to the THREE.Plane, there is no intersection
+
+  			if ( vN > 0 && vD >= 0 ) return null;
+
+  			// compute the distance from the ray’s origin to the intersection with the THREE.Plane
+
+  			const t = ( vD !== 0 ) ? ( - vN / vD ) : 0;
+
+  			// only proceed if the distance is positive. a negative distance means the intersection point
+  			// lies "behind" the origin
+
+  			if ( t <= 0 ) continue;
+
+  			// now categorized THREE.Plane as front-facing or back-facing
+
+  			if ( vD > 0 ) {
+
+  				//  THREE.Plane faces away from the ray, so this THREE.Plane is a back-face
+
+  				tFar = Math.min( t, tFar );
+
+  			} else {
+
+  				// front-face
+
+  				tNear = Math.max( t, tNear );
+
+  			}
+
+  			if ( tNear > tFar ) {
+
+  				// if tNear ever is greater than tFar, the ray must miss the convex hull
+
+  				return null;
+
+  			}
+
+  		}
+
+  		// evaluate intersection point
+
+  		// always try tNear first since its the closer intersection point
+
+  		if ( tNear !== - Infinity ) {
+
+  			ray.at( tNear, target );
+
+  		} else {
+
+  			ray.at( tFar, target );
+
+  		}
+
+  		return target;
+
+  	}
+
+  	intersectsRay( ray ) {
+
+  		return this.intersectRay( ray, _v1 ) !== null;
+
+  	}
+
+  	makeEmpty() {
+
+  		this.faces = [];
+  		this.vertices = [];
+
+  		return this;
+
+  	}
+
+  	// Adds a vertex to the 'assigned' list of vertices and assigns it to the given face
+
+  	addVertexToFace( vertex, face ) {
+
+  		vertex.face = face;
+
+  		if ( face.outside === null ) {
+
+  			this.assigned.append( vertex );
+
+  		} else {
+
+  			this.assigned.insertBefore( face.outside, vertex );
+
+  		}
+
+  		face.outside = vertex;
+
+  		return this;
+
+  	}
+
+  	// Removes a vertex from the 'assigned' list of vertices and from the given face
+
+  	removeVertexFromFace( vertex, face ) {
+
+  		if ( vertex === face.outside ) {
+
+  			// fix face.outside link
+
+  			if ( vertex.next !== null && vertex.next.face === face ) {
+
+  				// face has at least 2 outside vertices, move the 'outside' reference
+
+  				face.outside = vertex.next;
+
+  			} else {
+
+  				// vertex was the only outside vertex that face had
+
+  				face.outside = null;
+
+  			}
+
+  		}
+
+  		this.assigned.remove( vertex );
+
+  		return this;
+
+  	}
+
+  	// Removes all the visible vertices that a given face is able to see which are stored in the 'assigned' vertext list
+
+  	removeAllVerticesFromFace( face ) {
+
+  		if ( face.outside !== null ) {
+
+  			// reference to the first and last vertex of this face
+
+  			const start = face.outside;
+  			let end = face.outside;
+
+  			while ( end.next !== null && end.next.face === face ) {
+
+  				end = end.next;
+
+  			}
+
+  			this.assigned.removeSubList( start, end );
+
+  			// fix references
+
+  			start.prev = end.next = null;
+  			face.outside = null;
+
+  			return start;
+
+  		}
+
+  	}
+
+  	// Removes all the visible vertices that 'face' is able to see
+
+  	deleteFaceVertices( face, absorbingFace ) {
+
+  		const faceVertices = this.removeAllVerticesFromFace( face );
+
+  		if ( faceVertices !== undefined ) {
+
+  			if ( absorbingFace === undefined ) {
+
+  				// mark the vertices to be reassigned to some other face
+
+  				this.unassigned.appendChain( faceVertices );
+
+
+  			} else {
+
+  				// if there's an absorbing face try to assign as many vertices as possible to it
+
+  				let vertex = faceVertices;
+
+  				do {
+
+  					// we need to buffer the subsequent vertex at this point because the 'vertex.next' reference
+  					// will be changed by upcoming method calls
+
+  					const nextVertex = vertex.next;
+
+  					const distance = absorbingFace.distanceToPoint( vertex.point );
+
+  					// check if 'vertex' is able to see 'absorbingFace'
+
+  					if ( distance > this.tolerance ) {
+
+  						this.addVertexToFace( vertex, absorbingFace );
+
+  					} else {
+
+  						this.unassigned.append( vertex );
+
+  					}
+
+  					// now assign next vertex
+
+  					vertex = nextVertex;
+
+  				} while ( vertex !== null );
+
+  			}
+
+  		}
+
+  		return this;
+
+  	}
+
+  	// Reassigns as many vertices as possible from the unassigned list to the new faces
+
+  	resolveUnassignedPoints( newFaces ) {
+
+  		if ( this.unassigned.isEmpty() === false ) {
+
+  			let vertex = this.unassigned.first();
+
+  			do {
+
+  				// buffer 'next' reference, see .deleteFaceVertices()
+
+  				const nextVertex = vertex.next;
+
+  				let maxDistance = this.tolerance;
+
+  				let maxFace = null;
+
+  				for ( let i = 0; i < newFaces.length; i ++ ) {
+
+  					const face = newFaces[ i ];
+
+  					if ( face.mark === Visible ) {
+
+  						const distance = face.distanceToPoint( vertex.point );
+
+  						if ( distance > maxDistance ) {
+
+  							maxDistance = distance;
+  							maxFace = face;
+
+  						}
+
+  						if ( maxDistance > 1000 * this.tolerance ) break;
+
+  					}
+
+  				}
+
+  				// 'maxFace' can be null e.g. if there are identical vertices
+
+  				if ( maxFace !== null ) {
+
+  					this.addVertexToFace( vertex, maxFace );
+
+  				}
+
+  				vertex = nextVertex;
+
+  			} while ( vertex !== null );
+
+  		}
+
+  		return this;
+
+  	}
+
+  	// Computes the extremes of a simplex which will be the initial hull
+
+  	computeExtremes() {
+
+  		const min = new THREE.Vector3();
+  		const max = new THREE.Vector3();
+
+  		const minVertices = [];
+  		const maxVertices = [];
+
+  		// initially assume that the first vertex is the min/max
+
+  		for ( let i = 0; i < 3; i ++ ) {
+
+  			minVertices[ i ] = maxVertices[ i ] = this.vertices[ 0 ];
+
+  		}
+
+  		min.copy( this.vertices[ 0 ].point );
+  		max.copy( this.vertices[ 0 ].point );
+
+  		// compute the min/max vertex on all six directions
+
+  		for ( let i = 0, l = this.vertices.length; i < l; i ++ ) {
+
+  			const vertex = this.vertices[ i ];
+  			const point = vertex.point;
+
+  			// update the min coordinates
+
+  			for ( let j = 0; j < 3; j ++ ) {
+
+  				if ( point.getComponent( j ) < min.getComponent( j ) ) {
+
+  					min.setComponent( j, point.getComponent( j ) );
+  					minVertices[ j ] = vertex;
+
+  				}
+
+  			}
+
+  			// update the max coordinates
+
+  			for ( let j = 0; j < 3; j ++ ) {
+
+  				if ( point.getComponent( j ) > max.getComponent( j ) ) {
+
+  					max.setComponent( j, point.getComponent( j ) );
+  					maxVertices[ j ] = vertex;
+
+  				}
+
+  			}
+
+  		}
+
+  		// use min/max vectors to compute an optimal epsilon
+
+  		this.tolerance = 3 * Number.EPSILON * (
+  			Math.max( Math.abs( min.x ), Math.abs( max.x ) ) +
+  			Math.max( Math.abs( min.y ), Math.abs( max.y ) ) +
+  			Math.max( Math.abs( min.z ), Math.abs( max.z ) )
+  		);
+
+  		return { min: minVertices, max: maxVertices };
+
+  	}
+
+  	// Computes the initial simplex assigning to its faces all the points
+  	// that are candidates to form part of the hull
+
+  	computeInitialHull() {
+
+  		const vertices = this.vertices;
+  		const extremes = this.computeExtremes();
+  		const min = extremes.min;
+  		const max = extremes.max;
+
+  		// 1. Find the two vertices 'v0' and 'v1' with the greatest 1d separation
+  		// (max.x - min.x)
+  		// (max.y - min.y)
+  		// (max.z - min.z)
+
+  		let maxDistance = 0;
+  		let index = 0;
+
+  		for ( let i = 0; i < 3; i ++ ) {
+
+  			const distance = max[ i ].point.getComponent( i ) - min[ i ].point.getComponent( i );
+
+  			if ( distance > maxDistance ) {
+
+  				maxDistance = distance;
+  				index = i;
+
+  			}
+
+  		}
+
+  		const v0 = min[ index ];
+  		const v1 = max[ index ];
+  		let v2;
+  		let v3;
+
+  		// 2. The next vertex 'v2' is the one farthest to the line formed by 'v0' and 'v1'
+
+  		maxDistance = 0;
+  		_Line3.set( v0.point, v1.point );
+
+  		for ( let i = 0, l = this.vertices.length; i < l; i ++ ) {
+
+  			const vertex = vertices[ i ];
+
+  			if ( vertex !== v0 && vertex !== v1 ) {
+
+  				_Line3.closestPointToPoint( vertex.point, true, _closestPoint );
+
+  				const distance = _closestPoint.distanceToSquared( vertex.point );
+
+  				if ( distance > maxDistance ) {
+
+  					maxDistance = distance;
+  					v2 = vertex;
+
+  				}
+
+  			}
+
+  		}
+
+  		// 3. The next vertex 'v3' is the one farthest to the THREE.Plane 'v0', 'v1', 'v2'
+
+  		maxDistance = - 1;
+  		_Plane.setFromCoplanarPoints( v0.point, v1.point, v2.point );
+
+  		for ( let i = 0, l = this.vertices.length; i < l; i ++ ) {
+
+  			const vertex = vertices[ i ];
+
+  			if ( vertex !== v0 && vertex !== v1 && vertex !== v2 ) {
+
+  				const distance = Math.abs( _Plane.distanceToPoint( vertex.point ) );
+
+  				if ( distance > maxDistance ) {
+
+  					maxDistance = distance;
+  					v3 = vertex;
+
+  				}
+
+  			}
+
+  		}
+
+  		const faces = [];
+
+  		if ( _Plane.distanceToPoint( v3.point ) < 0 ) {
+
+  			// the face is not able to see the point so 'THREE.Plane.normal' is pointing outside the tetrahedron
+
+  			faces.push(
+  				Face.create( v0, v1, v2 ),
+  				Face.create( v3, v1, v0 ),
+  				Face.create( v3, v2, v1 ),
+  				Face.create( v3, v0, v2 )
+  			);
+
+  			// set the twin edge
+
+  			for ( let i = 0; i < 3; i ++ ) {
+
+  				const j = ( i + 1 ) % 3;
+
+  				// join face[ i ] i > 0, with the first face
+
+  				faces[ i + 1 ].getEdge( 2 ).setTwin( faces[ 0 ].getEdge( j ) );
+
+  				// join face[ i ] with face[ i + 1 ], 1 <= i <= 3
+
+  				faces[ i + 1 ].getEdge( 1 ).setTwin( faces[ j + 1 ].getEdge( 0 ) );
+
+  			}
+
+  		} else {
+
+  			// the face is able to see the point so 'THREE.Plane.normal' is pointing inside the tetrahedron
+
+  			faces.push(
+  				Face.create( v0, v2, v1 ),
+  				Face.create( v3, v0, v1 ),
+  				Face.create( v3, v1, v2 ),
+  				Face.create( v3, v2, v0 )
+  			);
+
+  			// set the twin edge
+
+  			for ( let i = 0; i < 3; i ++ ) {
+
+  				const j = ( i + 1 ) % 3;
+
+  				// join face[ i ] i > 0, with the first face
+
+  				faces[ i + 1 ].getEdge( 2 ).setTwin( faces[ 0 ].getEdge( ( 3 - i ) % 3 ) );
+
+  				// join face[ i ] with face[ i + 1 ]
+
+  				faces[ i + 1 ].getEdge( 0 ).setTwin( faces[ j + 1 ].getEdge( 1 ) );
+
+  			}
+
+  		}
+
+  		// the initial hull is the tetrahedron
+
+  		for ( let i = 0; i < 4; i ++ ) {
+
+  			this.faces.push( faces[ i ] );
+
+  		}
+
+  		// initial assignment of vertices to the faces of the tetrahedron
+
+  		for ( let i = 0, l = vertices.length; i < l; i ++ ) {
+
+  			const vertex = vertices[ i ];
+
+  			if ( vertex !== v0 && vertex !== v1 && vertex !== v2 && vertex !== v3 ) {
+
+  				maxDistance = this.tolerance;
+  				let maxFace = null;
+
+  				for ( let j = 0; j < 4; j ++ ) {
+
+  					const distance = this.faces[ j ].distanceToPoint( vertex.point );
+
+  					if ( distance > maxDistance ) {
+
+  						maxDistance = distance;
+  						maxFace = this.faces[ j ];
+
+  					}
+
+  				}
+
+  				if ( maxFace !== null ) {
+
+  					this.addVertexToFace( vertex, maxFace );
+
+  				}
+
+  			}
+
+  		}
+
+  		return this;
+
+  	}
+
+  	// Removes inactive faces
+
+  	reindexFaces() {
+
+  		const activeFaces = [];
+
+  		for ( let i = 0; i < this.faces.length; i ++ ) {
+
+  			const face = this.faces[ i ];
+
+  			if ( face.mark === Visible ) {
+
+  				activeFaces.push( face );
+
+  			}
+
+  		}
+
+  		this.faces = activeFaces;
+
+  		return this;
+
+  	}
+
+  	// Finds the next vertex to create faces with the current hull
+
+  	nextVertexToAdd() {
+
+  		// if the 'assigned' list of vertices is empty, no vertices are left. return with 'undefined'
+
+  		if ( this.assigned.isEmpty() === false ) {
+
+  			let eyeVertex, maxDistance = 0;
+
+  			// grap the first available face and start with the first visible vertex of that face
+
+  			const eyeFace = this.assigned.first().face;
+  			let vertex = eyeFace.outside;
+
+  			// now calculate the farthest vertex that face can see
+
+  			do {
+
+  				const distance = eyeFace.distanceToPoint( vertex.point );
+
+  				if ( distance > maxDistance ) {
+
+  					maxDistance = distance;
+  					eyeVertex = vertex;
+
+  				}
+
+  				vertex = vertex.next;
+
+  			} while ( vertex !== null && vertex.face === eyeFace );
+
+  			return eyeVertex;
+
+  		}
+
+  	}
+
+  	// Computes a chain of half edges in CCW order called the 'horizon'.
+  	// For an edge to be part of the horizon it must join a face that can see
+  	// 'eyePoint' and a face that cannot see 'eyePoint'.
+
+  	computeHorizon( eyePoint, crossEdge, face, horizon ) {
+
+  		// moves face's vertices to the 'unassigned' vertex list
+
+  		this.deleteFaceVertices( face );
+
+  		face.mark = Deleted;
+
+  		let edge;
+
+  		if ( crossEdge === null ) {
+
+  			edge = crossEdge = face.getEdge( 0 );
+
+  		} else {
+
+  			// start from the next edge since 'crossEdge' was already analyzed
+  			// (actually 'crossEdge.twin' was the edge who called this method recursively)
+
+  			edge = crossEdge.next;
+
+  		}
+
+  		do {
+
+  			const twinEdge = edge.twin;
+  			const oppositeFace = twinEdge.face;
+
+  			if ( oppositeFace.mark === Visible ) {
+
+  				if ( oppositeFace.distanceToPoint( eyePoint ) > this.tolerance ) {
+
+  					// the opposite face can see the vertex, so proceed with next edge
+
+  					this.computeHorizon( eyePoint, twinEdge, oppositeFace, horizon );
+
+  				} else {
+
+  					// the opposite face can't see the vertex, so this edge is part of the horizon
+
+  					horizon.push( edge );
+
+  				}
+
+  			}
+
+  			edge = edge.next;
+
+  		} while ( edge !== crossEdge );
+
+  		return this;
+
+  	}
+
+  	// Creates a face with the vertices 'eyeVertex.point', 'horizonEdge.tail' and 'horizonEdge.head' in CCW order
+
+  	addAdjoiningFace( eyeVertex, horizonEdge ) {
+
+  		// all the half edges are created in ccw order thus the face is always pointing outside the hull
+
+  		const face = Face.create( eyeVertex, horizonEdge.tail(), horizonEdge.head() );
+
+  		this.faces.push( face );
+
+  		// join face.getEdge( - 1 ) with the horizon's opposite edge face.getEdge( - 1 ) = face.getEdge( 2 )
+
+  		face.getEdge( - 1 ).setTwin( horizonEdge.twin );
+
+  		return face.getEdge( 0 ); // the half edge whose vertex is the eyeVertex
+
+
+  	}
+
+  	//  Adds 'horizon.length' faces to the hull, each face will be linked with the
+  	//  horizon opposite face and the face on the left/right
+
+  	addNewFaces( eyeVertex, horizon ) {
+
+  		this.newFaces = [];
+
+  		let firstSideEdge = null;
+  		let previousSideEdge = null;
+
+  		for ( let i = 0; i < horizon.length; i ++ ) {
+
+  			const horizonEdge = horizon[ i ];
+
+  			// returns the right side edge
+
+  			const sideEdge = this.addAdjoiningFace( eyeVertex, horizonEdge );
+
+  			if ( firstSideEdge === null ) {
+
+  				firstSideEdge = sideEdge;
+
+  			} else {
+
+  				// joins face.getEdge( 1 ) with previousFace.getEdge( 0 )
+
+  				sideEdge.next.setTwin( previousSideEdge );
+
+  			}
+
+  			this.newFaces.push( sideEdge.face );
+  			previousSideEdge = sideEdge;
+
+  		}
+
+  		// perform final join of new faces
+
+  		firstSideEdge.next.setTwin( previousSideEdge );
+
+  		return this;
+
+  	}
+
+  	// Adds a vertex to the hull
+
+  	addVertexToHull( eyeVertex ) {
+
+  		const horizon = [];
+
+  		this.unassigned.clear();
+
+  		// remove 'eyeVertex' from 'eyeVertex.face' so that it can't be added to the 'unassigned' vertex list
+
+  		this.removeVertexFromFace( eyeVertex, eyeVertex.face );
+
+  		this.computeHorizon( eyeVertex.point, null, eyeVertex.face, horizon );
+
+  		this.addNewFaces( eyeVertex, horizon );
+
+  		// reassign 'unassigned' vertices to the new faces
+
+  		this.resolveUnassignedPoints( this.newFaces );
+
+  		return	this;
+
+  	}
+
+  	cleanup() {
+
+  		this.assigned.clear();
+  		this.unassigned.clear();
+  		this.newFaces = [];
+
+  		return this;
+
+  	}
+
+  	compute() {
+
+  		let vertex;
+
+  		this.computeInitialHull();
+
+  		// add all available vertices gradually to the hull
+
+  		while ( ( vertex = this.nextVertexToAdd() ) !== undefined ) {
+
+  			this.addVertexToHull( vertex );
+
+  		}
+
+  		this.reindexFaces();
+
+  		this.cleanup();
+
+  		return this;
+
+  	}
+
+  }
+
+  //
+
+  class Face {
+
+  	constructor() {
+
+  		this.normal = new THREE.Vector3();
+  		this.midpoint = new THREE.Vector3();
+  		this.area = 0;
+
+  		this.constant = 0; // signed distance from face to the origin
+  		this.outside = null; // reference to a vertex in a vertex list this face can see
+  		this.mark = Visible;
+  		this.edge = null;
+
+  	}
+
+  	static create( a, b, c ) {
+
+  		const face = new Face();
+
+  		const e0 = new HalfEdge( a, face );
+  		const e1 = new HalfEdge( b, face );
+  		const e2 = new HalfEdge( c, face );
+
+  		// join edges
+
+  		e0.next = e2.prev = e1;
+  		e1.next = e0.prev = e2;
+  		e2.next = e1.prev = e0;
+
+  		// main half edge reference
+
+  		face.edge = e0;
+
+  		return face.compute();
+
+  	}
+
+  	getEdge( i ) {
+
+  		let edge = this.edge;
+
+  		while ( i > 0 ) {
+
+  			edge = edge.next;
+  			i --;
+
+  		}
+
+  		while ( i < 0 ) {
+
+  			edge = edge.prev;
+  			i ++;
+
+  		}
+
+  		return edge;
+
+  	}
+
+  	compute() {
+
+  		const a = this.edge.tail();
+  		const b = this.edge.head();
+  		const c = this.edge.next.head();
+
+  		_Triangle.set( a.point, b.point, c.point );
+
+  		_Triangle.getNormal( this.normal );
+  		_Triangle.getMidpoint( this.midpoint );
+  		this.area = _Triangle.getArea();
+
+  		this.constant = this.normal.dot( this.midpoint );
+
+  		return this;
+
+  	}
+
+  	distanceToPoint( point ) {
+
+  		return this.normal.dot( point ) - this.constant;
+
+  	}
+
+  }
+
+  // Entity for a Doubly-Connected Edge List (DCEL).
+
+  class HalfEdge {
+
+
+  	constructor( vertex, face ) {
+
+  		this.vertex = vertex;
+  		this.prev = null;
+  		this.next = null;
+  		this.twin = null;
+  		this.face = face;
+
+  	}
+
+  	head() {
+
+  		return this.vertex;
+
+  	}
+
+  	tail() {
+
+  		return this.prev ? this.prev.vertex : null;
+
+  	}
+
+  	length() {
+
+  		const head = this.head();
+  		const tail = this.tail();
+
+  		if ( tail !== null ) {
+
+  			return tail.point.distanceTo( head.point );
+
+  		}
+
+  		return - 1;
+
+  	}
+
+  	lengthSquared() {
+
+  		const head = this.head();
+  		const tail = this.tail();
+
+  		if ( tail !== null ) {
+
+  			return tail.point.distanceToSquared( head.point );
+
+  		}
+
+  		return - 1;
+
+  	}
+
+  	setTwin( edge ) {
+
+  		this.twin = edge;
+  		edge.twin = this;
+
+  		return this;
+
+  	}
+
+  }
+
+  // A vertex as a double linked list node.
+
+  class VertexNode {
+
+  	constructor( point ) {
+
+  		this.point = point;
+  		this.prev = null;
+  		this.next = null;
+  		this.face = null; // the face that is able to see this vertex
+
+  	}
+
+  }
+
+  // A double linked list that contains vertex nodes.
+
+  class VertexList {
+
+  	constructor() {
+
+  		this.head = null;
+  		this.tail = null;
+
+  	}
+
+  	first() {
+
+  		return this.head;
+
+  	}
+
+  	last() {
+
+  		return this.tail;
+
+  	}
+
+  	clear() {
+
+  		this.head = this.tail = null;
+
+  		return this;
+
+  	}
+
+  	// Inserts a vertex before the target vertex
+
+  	insertBefore( target, vertex ) {
+
+  		vertex.prev = target.prev;
+  		vertex.next = target;
+
+  		if ( vertex.prev === null ) {
+
+  			this.head = vertex;
+
+  		} else {
+
+  			vertex.prev.next = vertex;
+
+  		}
+
+  		target.prev = vertex;
+
+  		return this;
+
+  	}
+
+  	// Inserts a vertex after the target vertex
+
+  	insertAfter( target, vertex ) {
+
+  		vertex.prev = target;
+  		vertex.next = target.next;
+
+  		if ( vertex.next === null ) {
+
+  			this.tail = vertex;
+
+  		} else {
+
+  			vertex.next.prev = vertex;
+
+  		}
+
+  		target.next = vertex;
+
+  		return this;
+
+  	}
+
+  	// Appends a vertex to the end of the linked list
+
+  	append( vertex ) {
+
+  		if ( this.head === null ) {
+
+  			this.head = vertex;
+
+  		} else {
+
+  			this.tail.next = vertex;
+
+  		}
+
+  		vertex.prev = this.tail;
+  		vertex.next = null; // the tail has no subsequent vertex
+
+  		this.tail = vertex;
+
+  		return this;
+
+  	}
+
+  	// Appends a chain of vertices where 'vertex' is the head.
+
+  	appendChain( vertex ) {
+
+  		if ( this.head === null ) {
+
+  			this.head = vertex;
+
+  		} else {
+
+  			this.tail.next = vertex;
+
+  		}
+
+  		vertex.prev = this.tail;
+
+  		// ensure that the 'tail' reference points to the last vertex of the chain
+
+  		while ( vertex.next !== null ) {
+
+  			vertex = vertex.next;
+
+  		}
+
+  		this.tail = vertex;
+
+  		return this;
+
+  	}
+
+  	// Removes a vertex from the linked list
+
+  	remove( vertex ) {
+
+  		if ( vertex.prev === null ) {
+
+  			this.head = vertex.next;
+
+  		} else {
+
+  			vertex.prev.next = vertex.next;
+
+  		}
+
+  		if ( vertex.next === null ) {
+
+  			this.tail = vertex.prev;
+
+  		} else {
+
+  			vertex.next.prev = vertex.prev;
+
+  		}
+
+  		return this;
+
+  	}
+
+  	// Removes a list of vertices whose 'head' is 'a' and whose 'tail' is b
+
+  	removeSubList( a, b ) {
+
+  		if ( a.prev === null ) {
+
+  			this.head = b.next;
+
+  		} else {
+
+  			a.prev.next = b.next;
+
+  		}
+
+  		if ( b.next === null ) {
+
+  			this.tail = a.prev;
+
+  		} else {
+
+  			b.next.prev = a.prev;
+
+  		}
+
+  		return this;
+
+  	}
+
+  	isEmpty() {
+
+  		return this.head === null;
+
+  	}
+
+  }
+
+
+  class ConvexGeometry extends THREE.BufferGeometry {
+
+  	constructor( object ) {
+
+  		super();
+
+  		// buffers
+
+  		const vertices = [];
+  		const normals = [];
+
+  		const convexHull = new ConvexHull().setFromObject( object );
+
+  		// generate vertices and normals
+
+  		const faces = convexHull.faces;
+
+  		for ( let i = 0; i < faces.length; i ++ ) {
+
+  			const face = faces[ i ];
+  			let edge = face.edge;
+
+  			// we move along a doubly-connected edge list to access all face points (see HalfEdge docs)
+
+  			do {
+
+  				const point = edge.head().point;
+
+  				vertices.push( point.x, point.y, point.z );
+  				normals.push( face.normal.x, face.normal.y, face.normal.z );
+
+  				edge = edge.next;
+
+  			} while ( edge !== face.edge );
+
+  		}
+
+  		// build geometry
+
+  		this.setAttribute( 'position', new THREE.Float32BufferAttribute( vertices, 3 ) );
+  		this.setAttribute( 'normal', new THREE.Float32BufferAttribute( normals, 3 ) );
+
+  	}
+
+  }
+
+  THREE.ConvexHull = ConvexHull;
+  THREE.Face = Face;
+  THREE.HalfEdge = HalfEdge;
+  THREE.VertexNode = VertexNode;
+  THREE.VertexList = VertexList;
+  THREE.ConvexGeometry2 = ConvexGeometry;
+  return( THREE );
+}
+
+
+
+
 ;// CONCATENATED MODULE: ./src/js/threeplugins.js
 
 /*
@@ -68327,6 +70169,7 @@ function add_text_sprite(THREE){
 
 
 
+
 let THREE = register_lut( three_module );
 
 THREE = register_orthographic_controls( THREE );
@@ -68334,6 +70177,27 @@ THREE = register_orthographic_controls( THREE );
 THREE = register_volumeShader1( THREE );
 THREE = register_volume2DShader1( THREE );
 THREE = add_text_sprite( THREE );
+THREE = regisater_convexhull( THREE );
+
+THREE.as_Matrix4 = (m) => {
+  const re = new THREE.Matrix4();
+  if(!Array.isArray(m)){ return(re); }
+
+  if( m.length <= 4 ){
+    try {
+      const m1 = m[3] || [0,0,0,1];
+      re.set(...m[0],...m[1],...m[2], ...m1);
+    } catch (e) {}
+    return( re );
+  }
+  // else m length is either 12 or 16
+  if( m.length == 12 ) {
+    re.set(...m, 0,0,0,1);
+  } if (m.length == 16) {
+    re.set(...m);
+  }
+  return( re );
+};
 
 
 
@@ -68353,9 +70217,11 @@ THREE = add_text_sprite( THREE );
 /* harmony export */   "jM": () => (/* binding */ get_or_default),
 /* harmony export */   "Ds": () => (/* binding */ debounce),
 /* harmony export */   "ht": () => (/* binding */ min2),
-/* harmony export */   "Q0": () => (/* binding */ sub2)
+/* harmony export */   "Q0": () => (/* binding */ sub2),
+/* harmony export */   "Wk": () => (/* binding */ vec3_to_string),
+/* harmony export */   "xy": () => (/* binding */ has_meta_keys)
 /* harmony export */ });
-/* unused harmony export float_to_int32 */
+/* unused harmony exports float_to_int32, throttle_promise */
 
 const invertColor = function(hex) {
     if (hex.indexOf('#') === 0) {
@@ -68489,10 +70355,39 @@ function get_or_default(map, key, _default = undefined){
   }
 }
 
+function vec3_to_string(v, ifInvalid = ""){
+  if( !v ){ return( ifInvalid ); }
+  if( Array.isArray(v) ){
+    return(`${v[0].toFixed(2)}, ${v[1].toFixed(2)}, ${v[2].toFixed(2)}`)
+  }
+  if( v.isVector3 ){
+    return(`${v.x.toFixed(2)}, ${v.y.toFixed(2)}, ${v.z.toFixed(2)}`)
+  }
+  return( ifInvalid );
+}
 
 
+function throttle_promise(){
+  let blocked = false;
 
-// Credit David Walsh (https://davidwalsh.name/javascript-debounce-function)
+  const new_promise = (f) => {
+    if( blocked ){ return; }
+    blocked = true;
+    const p = new Promise((resolve, reject) => {
+      try {
+        f(resolve, reject);
+      } catch (e) {}
+      blocked = false;
+    });
+    return( p );
+  };
+
+  return( new_promise );
+
+}
+
+
+// Credit: David Walsh (https://davidwalsh.name/javascript-debounce-function)
 
 // Returns a function, that, as long as it continues to be invoked, will not
 // be triggered. The function will be called after it stops being called for
@@ -68599,6 +70494,14 @@ const float_to_int32 = ( function () {
 } )();
 
 
+function has_meta_keys( event, shift = true, ctrl = true, alt = true){
+  let v1 = 0 + event.shiftKey + event.ctrlKey * 2 + event.altKey * 4,
+      v2 = 0 + shift + ctrl * 2 + alt * 4;
+  if( v1 === v2 ){
+    return(true);
+  }
+  return( false );
+}
 
 
 
@@ -68888,21 +70791,23 @@ var __webpack_exports__ = {};
 (() => {
 "use strict";
 /* unused harmony export BrainCanvas */
-/* harmony import */ var _js_download_js__WEBPACK_IMPORTED_MODULE_8__ = __webpack_require__(3121);
+/* harmony import */ var _js_download_js__WEBPACK_IMPORTED_MODULE_9__ = __webpack_require__(3121);
 /* harmony import */ var _js_WebGL_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(5278);
-/* harmony import */ var _js_threeplugins_js__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(178);
-/* harmony import */ var _js_data_controls_js__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(1658);
-/* harmony import */ var _js_shiny_tools_js__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(8173);
-/* harmony import */ var _js_threejs_scene_js__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(1619);
-/* harmony import */ var _js_threebrain_cache_js__WEBPACK_IMPORTED_MODULE_9__ = __webpack_require__(5664);
-/* harmony import */ var _js_constants_js__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(975);
-/* harmony import */ var _js_utils_js__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(3658);
-/* harmony import */ var json_2_csv__WEBPACK_IMPORTED_MODULE_7__ = __webpack_require__(7542);
-/* harmony import */ var json_2_csv__WEBPACK_IMPORTED_MODULE_7___default = /*#__PURE__*/__webpack_require__.n(json_2_csv__WEBPACK_IMPORTED_MODULE_7__);
+/* harmony import */ var _js_threeplugins_js__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(1829);
+/* harmony import */ var _js_core_gui_wrapper_js__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(2814);
+/* harmony import */ var _js_core_data_controls_js__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(6303);
+/* harmony import */ var _js_shiny_tools_js__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(8173);
+/* harmony import */ var _js_threejs_scene_js__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(1619);
+/* harmony import */ var _js_threebrain_cache_js__WEBPACK_IMPORTED_MODULE_10__ = __webpack_require__(5664);
+/* harmony import */ var _js_constants_js__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(975);
+/* harmony import */ var _js_utils_js__WEBPACK_IMPORTED_MODULE_7__ = __webpack_require__(3658);
+/* harmony import */ var json_2_csv__WEBPACK_IMPORTED_MODULE_8__ = __webpack_require__(7542);
+/* harmony import */ var json_2_csv__WEBPACK_IMPORTED_MODULE_8___default = /*#__PURE__*/__webpack_require__.n(json_2_csv__WEBPACK_IMPORTED_MODULE_8__);
 /**
  * @Author: Zhengjia Wang
  * Adapter of model (threejs_scene) and viewer (htmlwidgets)
  */
+
 
 
 
@@ -68919,13 +70824,13 @@ var __webpack_exports__ = {};
 
 
 const utils_toolbox = {
-  'padZero' : _js_utils_js__WEBPACK_IMPORTED_MODULE_6__/* .padZero */ .Bd,
-  'to_array' : _js_utils_js__WEBPACK_IMPORTED_MODULE_6__/* .to_array */ .AA,
-  'get_element_size' : _js_utils_js__WEBPACK_IMPORTED_MODULE_6__/* .get_element_size */ .nq,
-  'get_or_default' : _js_utils_js__WEBPACK_IMPORTED_MODULE_6__/* .get_or_default */ .jM,
-  'json2csv' : json_2_csv__WEBPACK_IMPORTED_MODULE_7__.json2csv,
-  'download' : _js_download_js__WEBPACK_IMPORTED_MODULE_8__/* .download */ .L,
-  'CONSTANTS' : _js_constants_js__WEBPACK_IMPORTED_MODULE_5__/* .CONSTANTS */ .t
+  'padZero' : _js_utils_js__WEBPACK_IMPORTED_MODULE_7__/* .padZero */ .Bd,
+  'to_array' : _js_utils_js__WEBPACK_IMPORTED_MODULE_7__/* .to_array */ .AA,
+  'get_element_size' : _js_utils_js__WEBPACK_IMPORTED_MODULE_7__/* .get_element_size */ .nq,
+  'get_or_default' : _js_utils_js__WEBPACK_IMPORTED_MODULE_7__/* .get_or_default */ .jM,
+  'json2csv' : json_2_csv__WEBPACK_IMPORTED_MODULE_8__.json2csv,
+  'download' : _js_download_js__WEBPACK_IMPORTED_MODULE_9__/* .download */ .L,
+  'CONSTANTS' : _js_constants_js__WEBPACK_IMPORTED_MODULE_6__/* .CONSTANTS */ .t
 }
 
 class BrainCanvas{
@@ -68986,10 +70891,10 @@ class BrainCanvas{
     this.el_side.appendChild( this.el_text );
 
     // 3. initialize threejs scene
-    this.canvas = new _js_threejs_scene_js__WEBPACK_IMPORTED_MODULE_4__/* .THREEBRAIN_CANVAS */ .S(
+    this.canvas = new _js_threejs_scene_js__WEBPACK_IMPORTED_MODULE_5__/* .THREEBRAIN_CANVAS */ .S(
       this.el, width, height, 250,
       this.shiny_mode, cache, this.DEBUG, this.has_webgl2);
-    this.shiny = new _js_shiny_tools_js__WEBPACK_IMPORTED_MODULE_3__/* .THREE_BRAIN_SHINY */ .P( this.outputId, this.canvas, this.shiny_mode );
+    this.shiny = new _js_shiny_tools_js__WEBPACK_IMPORTED_MODULE_4__/* .THREE_BRAIN_SHINY */ .P( this.outputId, this.canvas, this.shiny_mode );
 
     // 4. Animation, but do not render;
     this.canvas.animate();
@@ -69037,7 +70942,7 @@ class BrainCanvas{
 
     if( this.gui ){ try { this.gui.dispose(); } catch (e) {} }
 
-    const gui = new _js_data_controls_js__WEBPACK_IMPORTED_MODULE_2__/* .THREEBRAIN_CONTROL */ .E({
+    const gui = new _js_core_gui_wrapper_js__WEBPACK_IMPORTED_MODULE_2__/* .THREEBRAIN_CONTROL */ .E({
       autoPlace: false,
     }, this.DEBUG);
     if(this.DEBUG){
@@ -69065,7 +70970,7 @@ class BrainCanvas{
 
     // Add listeners
     const control_presets = this.settings.control_presets;
-    const presets = new _js_data_controls_js__WEBPACK_IMPORTED_MODULE_2__/* .THREEBRAIN_PRESETS */ .B( this.canvas, this.gui, this.settings, this.shiny );
+    const presets = new _js_core_data_controls_js__WEBPACK_IMPORTED_MODULE_3__/* .THREEBRAIN_PRESETS */ .B( this.canvas, this.gui, this.settings, this.shiny );
     this.presets = presets;
     if(this.DEBUG){
       window.presets = presets;
@@ -69102,7 +71007,7 @@ class BrainCanvas{
 
     // ---------------------------- Presets
     let _ani_control_registered = false;
-    (0,_js_utils_js__WEBPACK_IMPORTED_MODULE_6__/* .to_array */ .AA)( control_presets ).forEach((control_preset) => {
+    (0,_js_utils_js__WEBPACK_IMPORTED_MODULE_7__/* .to_array */ .AA)( control_presets ).forEach((control_preset) => {
 
       try {
         presets['c_' + control_preset]();
@@ -69187,7 +71092,7 @@ class BrainCanvas{
     this.canvas.pause_animation(9999);
     this.canvas.clear_all();
 
-    (0,_js_utils_js__WEBPACK_IMPORTED_MODULE_6__/* .to_array */ .AA)( this.settings.color_maps ).forEach((v) => {
+    (0,_js_utils_js__WEBPACK_IMPORTED_MODULE_7__/* .to_array */ .AA)( this.settings.color_maps ).forEach((v) => {
       // calculate cmap, add time range so that the last value is always displayed
       // let tr = v.time_range;
       this.canvas.add_colormap(
@@ -69279,7 +71184,7 @@ class BrainCanvas{
     this.canvas.set_font_size( this.settings.font_magnification || 1 );
 
     // Add/remove axis anchor
-    let coords = (0,_js_utils_js__WEBPACK_IMPORTED_MODULE_6__/* .to_array */ .AA)(this.settings.coords);
+    let coords = (0,_js_utils_js__WEBPACK_IMPORTED_MODULE_7__/* .to_array */ .AA)(this.settings.coords);
     if(coords.length === 3){
       this.canvas.draw_axis( coords[0], coords[1], coords[2] );
     }else{
@@ -69354,12 +71259,16 @@ class BrainCanvas{
         console.warn(e);
       }
     }
+
+    // canvas is ready. set flag
+    this.canvas.ready = true;
+
     // run customized js code
     if( this.settings.custom_javascript &&
         this.settings.custom_javascript !== ''){
 
       if( this.canvas.DEBUG ){
-        console.log("[threeBrain]: Executing customized js code:\n"+this.settings.custom_javascript);
+        console.debug("[threeBrain]: Executing customized js code:\n"+this.settings.custom_javascript);
       }
 
       const _f = (groups, geoms, settings, scene,
@@ -69382,8 +71291,8 @@ class BrainCanvas{
 window.BrainCanvas = BrainCanvas;
 window.THREE = _js_threeplugins_js__WEBPACK_IMPORTED_MODULE_1__/* .THREE */ .J;
 window._WEBGL = _js_WebGL_js__WEBPACK_IMPORTED_MODULE_0__/* .WEBGL */ .$;
-window.download = _js_download_js__WEBPACK_IMPORTED_MODULE_8__/* .download */ .L;
-window.THREEBRAIN_STORAGE = _js_threebrain_cache_js__WEBPACK_IMPORTED_MODULE_9__/* .THREEBRAIN_STORAGE */ .E;
+window.download = _js_download_js__WEBPACK_IMPORTED_MODULE_9__/* .download */ .L;
+window.THREEBRAIN_STORAGE = _js_threebrain_cache_js__WEBPACK_IMPORTED_MODULE_10__/* .THREEBRAIN_STORAGE */ .E;
 
 
 })();

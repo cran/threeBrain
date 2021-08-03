@@ -1,7 +1,7 @@
 Package: threeBrain
 Type: Package
 Title: 3D Brain Visualization
-Version: 0.2.0
+Version: 0.2.1
 Authors@R: c(
     person("Zhengjia", "Wang", email = "dipterix.wang@gmail.com", role = c("aut", "cre", "cph")),
     person("John", "Magnotti", email = "jmagnotti@bcm.edu", role = c("aut")),
@@ -37,7 +37,7 @@ Imports: grDevices, graphics, dipsaus, xml2, shiny (>= 1.2.0), digest
         (>= 0.7.5), oro.nifti (>= 0.9.1)
 Suggests: knitr, rmarkdown
 NeedsCompilation: no
-Packaged: 2021-07-26 21:27:57 UTC; dipterix
+Packaged: 2021-08-02 19:43:51 UTC; dipterix
 Author: Zhengjia Wang [aut, cre, cph],
   John Magnotti [aut],
   Brian Metzger [aut],
@@ -46,4 +46,4 @@ Author: Zhengjia Wang [aut, cre, cph],
   Michael Beauchamp [aut, dtc]
 Maintainer: Zhengjia Wang <dipterix.wang@gmail.com>
 Repository: CRAN
-Date/Publication: 2021-07-27 13:20:06 UTC
+Date/Publication: 2021-08-03 12:00:02 UTC
