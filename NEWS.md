@@ -1,3 +1,30 @@
+threeBrain 0.2.3
+=======
+
+## Changes
+
+* Electrode localization now has a `shiny` application
+
+### Improvements
+
+* Added 3 vignettes
+
+threeBrain 0.2.2
+=======
+
+## Changes
+
+* Supported video content to display auditory visual stimuli along the response
+* Default to closing the `default` and `volume` side folders
+
+### Improvements
+
+* Fixed electrode localization interpolation issue
+* Proper dispose the localized electrodes
+* Fixed screenshot and video recording functions
+* Renamed recording button to `Chrome`-specific
+
+
 threeBrain 0.2.1
 =======
 
