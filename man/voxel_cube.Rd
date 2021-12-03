@@ -6,7 +6,7 @@
 \alias{create_voxel_cube}
 \title{Generate volume data from 'MNI' coordinates}
 \usage{
-add_voxel_cube(brain, name, cube)
+add_voxel_cube(brain, name, cube, size = c(256, 256, 256), matrix_world = NULL)
 
 create_voxel_cube(
   mni_ras,
@@ -22,6 +22,10 @@ create_voxel_cube(
 \item{name}{the name of voxel cube, only letters, digits and \code{'_'} are allowed; other characters will be replaced by \code{'_'}}
 
 \item{cube}{a 3-mode array; see the following example}
+
+\item{size}{the actual size of the volume, usually dot multiplication of the dimension and voxel size}
+
+\item{matrix_world}{the transform matrix of the volume}
 
 \item{mni_ras}{'MNI' 'RAS' coordinates, should be a \code{n}-by-3 matrix}
 

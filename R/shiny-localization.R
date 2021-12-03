@@ -80,9 +80,17 @@ localization_module <- function(
       localize <- local({
         control_presets <- c('localization', control_presets)
         ct <- read_nii2( normalizePath(ct_path, mustWork = TRUE) )
-        cube <- reorient_volume( ct$get_data(), brain$Torig )
-        add_voxel_cube(brain, "CT", cube)
-        key <- seq(0, max(cube))
+        # cube <- reorient_volume( ct$get_data(), brain$Torig )
+
+        # TODO: FIXME
+        # calculate matrixWorld
+        ct_shift <- ct$get_center_matrix()
+        ct_qform <- ct$get_qform()
+        matrix_world <- brain$Torig %*% solve(brain$Norig) %*% ct_qform %*% ct_shift
+        # matrix_world <- NULL
+        add_voxel_cube(brain, "CT", ct$get_data(), size = ct$get_size(),
+                       matrix_world = matrix_world)
+        key <- seq(0, max(ct$get_range()))
         cmap <- create_colormap(
           gtype = 'volume', dtype = 'continuous',
           key = key, value = key,
@@ -93,6 +101,7 @@ localization_module <- function(
         controllers[["Voxel Type"]] <- "CT"
         controllers[["Voxel Min"]] <- 3000
         controllers[["Edit Mode"]] <- "CT/volume"
+        controllers[["Highlight Box"]] <- FALSE
         function(){
           brain$plot(
             control_presets = control_presets,
@@ -216,10 +225,10 @@ localization_module <- function(
 
       # assign('edit', edit, envir = globalenv())
 
-      mode <- sapply(nms, function(nm){ storage.mode(tbl[[nm]]) })
+      mode <- sapply(nms, function(nm){ mode(tbl[[nm]]) })
       params <- structure(lapply(seq_along(nms), function(ii){
         re <- edit$value[edit$col == ii]
-        storage.mode(re) <- mode[[ii]]
+        mode(re) <- mode[[ii]]
         re
       }), names = nms)
 
@@ -248,7 +257,6 @@ localization_module <- function(
           columns = c(1, 3:5, 9, 10:15))),
         selection = "single",
         rownames = TRUE,
-        caption = "Please add the electrode/channel number before saving to RAVE",
         filter = "none",
         options = list(
           dom = 'rtip',

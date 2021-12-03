@@ -55339,7 +55339,7 @@ class CanvasContext2D {
 
 /***/ }),
 
-/***/ 6303:
+/***/ 6683:
 /***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
 
 "use strict";
@@ -56038,7 +56038,7 @@ function register_controls_surface( THREEBRAIN_PRESETS ){
     const _c = this.gui.get_controller( 'Surface Color' );
     if( _c.isfake ){ return( "none" ); }
     return( _c.getValue() );
-  }
+  };
   THREEBRAIN_PRESETS.prototype.set_surface_ctype = function(
     t, params = {}
   ){
@@ -56105,7 +56105,7 @@ function register_controls_surface( THREEBRAIN_PRESETS ){
     this._update_canvas();
     this.fire_change({ 'surface_color_type' : this._current_surface_ctype });
 
-  }
+  };
 
   THREEBRAIN_PRESETS.prototype.c_surface_type2 = function(){
 
@@ -57118,6 +57118,9 @@ function raycast_volume_geneator(){
   const p = new threeplugins/* THREE.Vector3 */.J.Vector3();
   const p1 = new threeplugins/* THREE.Vector3 */.J.Vector3();
   const f = new threeplugins/* THREE.Vector3 */.J.Vector3();
+  const dest = new threeplugins/* THREE.Vector3 */.J.Vector3();
+  let l_x, l_y, l_z, i, j, k, tmp, k1, k2, l_res;
+  const res = [NaN, NaN, NaN, NaN, NaN, NaN, NaN];
 
   /*window.orig = orig;
   window.projection = projection;
@@ -57127,16 +57130,24 @@ function raycast_volume_geneator(){
 
   const raycast_volume = (
     origin, direction, margin_voxels, margin_lengths,
-    map_array, delta = 2 ) => {
+    map_array, delta = 0.5, snap_raycaster = true ) => {
     // canvas.mouse_raycaster.ray.origin
     // canvas.mouse_raycaster.ray.direction
 
-    orig.x = origin.x + ( margin_lengths.x - 1 ) / 2;
-    orig.y = origin.y + ( margin_lengths.y - 1 ) / 2;
-    orig.z = origin.z + ( margin_lengths.z - 1 ) / 2;
+    l_x = margin_lengths.x;
+    l_y = margin_lengths.y;
+    l_z = margin_lengths.z;
+
+    direction.normalize();
+
     f.x = margin_lengths.x / margin_voxels.x;
     f.y = margin_lengths.y / margin_voxels.y;
     f.z = margin_lengths.z / margin_voxels.z;
+
+    // vOrigin = (position - vec3(0.5, 0.5, 0.5)) * scale_inv - vDirection;
+    orig.x = origin.x + l_x / 2;
+    orig.y = origin.y + l_y / 2;
+    orig.z = origin.z + l_z / 2;
     projection.set(
       1-direction.x * direction.x,
       -direction.x * direction.y,
@@ -57159,11 +57170,13 @@ function raycast_volume_geneator(){
           mz = margin_voxels.z;
 
 
-    const res = [NaN, NaN, NaN, NaN, NaN, NaN, NaN];
+    for(i = 0; i < 7; i++){
+      res[i] = NaN;
+    }
 
-    for( let i = 0; i < margin_voxels.x; i++ ){
-      for( let j = 0; j < margin_voxels.y; j++ ){
-        p.set( i * f.x - orig.x, j * f.y - orig.y , 0 );
+    for( i = 0; i < margin_voxels.x; i++ ){
+      for( j = 0; j < margin_voxels.y; j++ ){
+        p.set( (i+0.5) * f.x - orig.x, (j+0.5) * f.y - orig.y , 0 );
         p1.copy( p );
         p.applyMatrix3( projection );
         p.set(
@@ -57192,18 +57205,31 @@ function raycast_volume_geneator(){
               ) * 4 + 3 ];
               if( tmp > 0 ){
                 p.set(
-                  i * f.x - orig.x,
-                  j * f.y - orig.y,
-                  k * f.z - orig.z
+                  (i+0.5) * f.x - orig.x,
+                  (j+0.5) * f.y - orig.y,
+                  (k+0.5) * f.z - orig.z
                 );
                 tmp = p.dot( direction );
                 if( tmp < dist ){
                   res[0] = i;
                   res[1] = j;
                   res[2] = k;
-                  res[3] = i * f.x - ( margin_lengths.x - 1 ) / 2;
-                  res[4] = j * f.y - ( margin_lengths.y - 1 ) / 2;
-                  res[5] = k * f.z - ( margin_lengths.z - 1 ) / 2;
+
+                  // voxel coordinate
+                  dest.set(
+                    (i+0.5) * f.x - l_x / 2,
+                    (j+0.5) * f.y - l_y / 2,
+                    (k+0.5) * f.z - l_z / 2
+                  );
+
+                  if( snap_raycaster ){
+                    l_res = dest.sub( origin ).dot( direction );
+                    dest.copy( direction ).multiplyScalar( l_res ).add( origin );
+                  }
+
+                  res[3] = dest.x;
+                  res[4] = dest.y;
+                  res[5] = dest.z;
                   res[6] = tmp;
                   dist = tmp;
                 }
@@ -57221,12 +57247,1316 @@ function raycast_volume_geneator(){
   return( raycast_volume );
 };
 
+const raycast_volume = raycast_volume_geneator();
+
+function electrode_from_ct_generator(){
+
+  const cube_dim = new threeplugins/* THREE.Vector3 */.J.Vector3(),
+        cube_size = new threeplugins/* THREE.Vector3 */.J.Vector3(),
+        origin = new threeplugins/* THREE.Vector3 */.J.Vector3(),
+        direction = new threeplugins/* THREE.Vector3 */.J.Vector3(),
+        pos = new threeplugins/* THREE.Vector3 */.J.Vector3();
+  const matrix_ = new threeplugins/* THREE.Matrix4 */.J.Matrix4(),
+        matrix_inv = new threeplugins/* THREE.Matrix4 */.J.Matrix4(),
+        matrix_rot = new threeplugins/* THREE.Matrix3 */.J.Matrix3();
+
+  const intersect_volume = ( src, dir, inst, canvas, delta = 1, snap_raycaster = true ) => {
+    if( !inst || !inst.isDataCube2 ){ return; }
+
+    matrix_.copy(inst.object.parent.matrixWorld);
+    matrix_inv.copy(matrix_).invert();
+    origin.copy(src).applyMatrix4(matrix_inv);
+
+    // direction no need to shift
+    matrix_rot.setFromMatrix4(matrix_inv);
+    direction.copy(dir).applyMatrix3(matrix_rot);
+
+    /*if(!canvas.__localization_helper){
+      canvas.__localization_helper = new THREE.ArrowHelper(new THREE.Vector3( 0, 0, 1 ), new THREE.Vector3( 0, 0, 0 ), 50, 0xff0000, 2 );
+      canvas.scene.add( canvas.__localization_helper );
+    }
+    canvas.__localization_helper.position.copy(origin);
+    canvas.__localization_helper.setDirection(dir);
+    */
+
+    cube_dim.fromArray( inst._cube_dim );
+    cube_size.set(
+      inst._margin_length.xLength,
+      inst._margin_length.yLength,
+      inst._margin_length.zLength
+    );
+
+    const res = raycast_volume(
+      origin, direction, cube_dim, cube_size,
+      inst._color_texture.image.data,
+      delta, snap_raycaster
+    );
+    pos.x = res[3];
+    pos.y = res[4];
+    pos.z = res[5];
+
+    pos.applyMatrix4( matrix_ );
+
+    return ( pos );
+  };
+
+  return( intersect_volume );
+
+}
+
+
+const intersect_volume = electrode_from_ct_generator();
+
+
+const electrode_from_ct = ( inst, canvas ) => {
+  // const inst = this.current_voxel_type();
+  if( !inst || !inst.isDataCube2 ){ return; }
+  canvas.set_raycaster();
+
+
+  return (
+    intersect_volume(
+      canvas.mouse_raycaster.ray.origin,
+      canvas.mouse_raycaster.ray.direction,
+      inst, canvas
+    )
+  );
+};
+
 
 
 
 // EXTERNAL MODULE: ./node_modules/downloadjs/download.js
 var downloadjs_download = __webpack_require__(3729);
+// EXTERNAL MODULE: ./src/build/three.module.js
+var three_module = __webpack_require__(7000);
+;// CONCATENATED MODULE: ./src/js/jsm/lines/LineSegmentsGeometry.js
+
+
+const _box = new three_module.Box3();
+const _vector = new three_module.Vector3();
+
+class LineSegmentsGeometry extends three_module.InstancedBufferGeometry {
+
+	constructor() {
+
+		super();
+
+		this.type = 'LineSegmentsGeometry';
+
+		const positions = [ - 1, 2, 0, 1, 2, 0, - 1, 1, 0, 1, 1, 0, - 1, 0, 0, 1, 0, 0, - 1, - 1, 0, 1, - 1, 0 ];
+		const uvs = [ - 1, 2, 1, 2, - 1, 1, 1, 1, - 1, - 1, 1, - 1, - 1, - 2, 1, - 2 ];
+		const index = [ 0, 2, 1, 2, 3, 1, 2, 4, 3, 4, 5, 3, 4, 6, 5, 6, 7, 5 ];
+
+		this.setIndex( index );
+		this.setAttribute( 'position', new three_module.Float32BufferAttribute( positions, 3 ) );
+		this.setAttribute( 'uv', new three_module.Float32BufferAttribute( uvs, 2 ) );
+
+	}
+
+	applyMatrix4( matrix ) {
+
+		const start = this.attributes.instanceStart;
+		const end = this.attributes.instanceEnd;
+
+		if ( start !== undefined ) {
+
+			start.applyMatrix4( matrix );
+
+			end.applyMatrix4( matrix );
+
+			start.needsUpdate = true;
+
+		}
+
+		if ( this.boundingBox !== null ) {
+
+			this.computeBoundingBox();
+
+		}
+
+		if ( this.boundingSphere !== null ) {
+
+			this.computeBoundingSphere();
+
+		}
+
+		return this;
+
+	}
+
+	setPositions( array ) {
+
+		let lineSegments;
+
+		if ( array instanceof Float32Array ) {
+
+			lineSegments = array;
+
+		} else if ( Array.isArray( array ) ) {
+
+			lineSegments = new Float32Array( array );
+
+		}
+
+		const instanceBuffer = new three_module.InstancedInterleavedBuffer( lineSegments, 6, 1 ); // xyz, xyz
+
+		this.setAttribute( 'instanceStart', new three_module.InterleavedBufferAttribute( instanceBuffer, 3, 0 ) ); // xyz
+		this.setAttribute( 'instanceEnd', new three_module.InterleavedBufferAttribute( instanceBuffer, 3, 3 ) ); // xyz
+
+		//
+
+		this.computeBoundingBox();
+		this.computeBoundingSphere();
+
+		return this;
+
+	}
+
+	setColors( array ) {
+
+		let colors;
+
+		if ( array instanceof Float32Array ) {
+
+			colors = array;
+
+		} else if ( Array.isArray( array ) ) {
+
+			colors = new Float32Array( array );
+
+		}
+
+		const instanceColorBuffer = new three_module.InstancedInterleavedBuffer( colors, 6, 1 ); // rgb, rgb
+
+		this.setAttribute( 'instanceColorStart', new three_module.InterleavedBufferAttribute( instanceColorBuffer, 3, 0 ) ); // rgb
+		this.setAttribute( 'instanceColorEnd', new three_module.InterleavedBufferAttribute( instanceColorBuffer, 3, 3 ) ); // rgb
+
+		return this;
+
+	}
+
+	fromWireframeGeometry( geometry ) {
+
+		this.setPositions( geometry.attributes.position.array );
+
+		return this;
+
+	}
+
+	fromEdgesGeometry( geometry ) {
+
+		this.setPositions( geometry.attributes.position.array );
+
+		return this;
+
+	}
+
+	fromMesh( mesh ) {
+
+		this.fromWireframeGeometry( new three_module.WireframeGeometry( mesh.geometry ) );
+
+		// set colors, maybe
+
+		return this;
+
+	}
+
+	fromLineSegments( lineSegments ) {
+
+		const geometry = lineSegments.geometry;
+
+		if ( geometry.isGeometry ) {
+
+			console.error( 'THREE.LineSegmentsGeometry no longer supports Geometry. Use THREE.BufferGeometry instead.' );
+			return;
+
+		} else if ( geometry.isBufferGeometry ) {
+
+			this.setPositions( geometry.attributes.position.array ); // assumes non-indexed
+
+		}
+
+		// set colors, maybe
+
+		return this;
+
+	}
+
+	computeBoundingBox() {
+
+		if ( this.boundingBox === null ) {
+
+			this.boundingBox = new three_module.Box3();
+
+		}
+
+		const start = this.attributes.instanceStart;
+		const end = this.attributes.instanceEnd;
+
+		if ( start !== undefined && end !== undefined ) {
+
+			this.boundingBox.setFromBufferAttribute( start );
+
+			_box.setFromBufferAttribute( end );
+
+			this.boundingBox.union( _box );
+
+		}
+
+	}
+
+	computeBoundingSphere() {
+
+		if ( this.boundingSphere === null ) {
+
+			this.boundingSphere = new three_module.Sphere();
+
+		}
+
+		if ( this.boundingBox === null ) {
+
+			this.computeBoundingBox();
+
+		}
+
+		const start = this.attributes.instanceStart;
+		const end = this.attributes.instanceEnd;
+
+		if ( start !== undefined && end !== undefined ) {
+
+			const center = this.boundingSphere.center;
+
+			this.boundingBox.getCenter( center );
+
+			let maxRadiusSq = 0;
+
+			for ( let i = 0, il = start.count; i < il; i ++ ) {
+
+				_vector.fromBufferAttribute( start, i );
+				maxRadiusSq = Math.max( maxRadiusSq, center.distanceToSquared( _vector ) );
+
+				_vector.fromBufferAttribute( end, i );
+				maxRadiusSq = Math.max( maxRadiusSq, center.distanceToSquared( _vector ) );
+
+			}
+
+			this.boundingSphere.radius = Math.sqrt( maxRadiusSq );
+
+			if ( isNaN( this.boundingSphere.radius ) ) {
+
+				console.error( 'THREE.LineSegmentsGeometry.computeBoundingSphere(): Computed radius is NaN. The instanced position data is likely to have NaN values.', this );
+
+			}
+
+		}
+
+	}
+
+	toJSON() {
+
+		// todo
+
+	}
+
+	applyMatrix( matrix ) {
+
+		console.warn( 'THREE.LineSegmentsGeometry: applyMatrix() has been renamed to applyMatrix4().' );
+
+		return this.applyMatrix4( matrix );
+
+	}
+
+}
+
+LineSegmentsGeometry.prototype.isLineSegmentsGeometry = true;
+
+
+
+;// CONCATENATED MODULE: ./src/js/jsm/lines/LineMaterial.js
+/**
+ * parameters = {
+ *  color: <hex>,
+ *  linewidth: <float>,
+ *  dashed: <boolean>,
+ *  dashScale: <float>,
+ *  dashSize: <float>,
+ *  dashOffset: <float>,
+ *  gapSize: <float>,
+ *  resolution: <Vector2>, // to be set by renderer
+ * }
+ */
+
+
+
+
+three_module.UniformsLib.line = {
+
+	worldUnits: { value: 1 },
+	linewidth: { value: 1 },
+	resolution: { value: new three_module.Vector2( 1, 1 ) },
+	dashOffset: { value: 0 },
+	dashScale: { value: 1 },
+	dashSize: { value: 1 },
+	gapSize: { value: 1 } // todo FIX - maybe change to totalSize
+
+};
+
+three_module.ShaderLib.line = {
+
+	uniforms: three_module.UniformsUtils.merge( [
+		three_module.UniformsLib.common,
+		three_module.UniformsLib.fog,
+		three_module.UniformsLib.line
+	] ),
+
+	vertexShader:
+	/* glsl */`
+		#include <common>
+		#include <color_pars_vertex>
+		#include <fog_pars_vertex>
+		#include <logdepthbuf_pars_vertex>
+		#include <clipping_planes_pars_vertex>
+
+		uniform float linewidth;
+		uniform vec2 resolution;
+
+		attribute vec3 instanceStart;
+		attribute vec3 instanceEnd;
+
+		attribute vec3 instanceColorStart;
+		attribute vec3 instanceColorEnd;
+
+		#ifdef WORLD_UNITS
+
+			varying vec4 worldPos;
+			varying vec3 worldStart;
+			varying vec3 worldEnd;
+
+			#ifdef USE_DASH
+
+				varying vec2 vUv;
+
+			#endif
+
+		#else
+
+			varying vec2 vUv;
+
+		#endif
+
+		#ifdef USE_DASH
+
+			uniform float dashScale;
+			attribute float instanceDistanceStart;
+			attribute float instanceDistanceEnd;
+			varying float vLineDistance;
+
+		#endif
+
+		void trimSegment( const in vec4 start, inout vec4 end ) {
+
+			// trim end segment so it terminates between the camera plane and the near plane
+
+			// conservative estimate of the near plane
+			float a = projectionMatrix[ 2 ][ 2 ]; // 3nd entry in 3th column
+			float b = projectionMatrix[ 3 ][ 2 ]; // 3nd entry in 4th column
+			float nearEstimate = - 0.5 * b / a;
+
+			float alpha = ( nearEstimate - start.z ) / ( end.z - start.z );
+
+			end.xyz = mix( start.xyz, end.xyz, alpha );
+
+		}
+
+		void main() {
+
+			#ifdef USE_COLOR
+
+				vColor.xyz = ( position.y < 0.5 ) ? instanceColorStart : instanceColorEnd;
+
+			#endif
+
+			#ifdef USE_DASH
+
+				vLineDistance = ( position.y < 0.5 ) ? dashScale * instanceDistanceStart : dashScale * instanceDistanceEnd;
+				vUv = uv;
+
+			#endif
+
+			float aspect = resolution.x / resolution.y;
+
+			// camera space
+			vec4 start = modelViewMatrix * vec4( instanceStart, 1.0 );
+			vec4 end = modelViewMatrix * vec4( instanceEnd, 1.0 );
+
+			#ifdef WORLD_UNITS
+
+				worldStart = start.xyz;
+				worldEnd = end.xyz;
+
+			#else
+
+				vUv = uv;
+
+			#endif
+
+			// special case for perspective projection, and segments that terminate either in, or behind, the camera plane
+			// clearly the gpu firmware has a way of addressing this issue when projecting into ndc space
+			// but we need to perform ndc-space calculations in the shader, so we must address this issue directly
+			// perhaps there is a more elegant solution -- WestLangley
+
+			bool perspective = ( projectionMatrix[ 2 ][ 3 ] == - 1.0 ); // 4th entry in the 3rd column
+
+			if ( perspective ) {
+
+				if ( start.z < 0.0 && end.z >= 0.0 ) {
+
+					trimSegment( start, end );
+
+				} else if ( end.z < 0.0 && start.z >= 0.0 ) {
+
+					trimSegment( end, start );
+
+				}
+
+			}
+
+			// clip space
+			vec4 clipStart = projectionMatrix * start;
+			vec4 clipEnd = projectionMatrix * end;
+
+			// ndc space
+			vec3 ndcStart = clipStart.xyz / clipStart.w;
+			vec3 ndcEnd = clipEnd.xyz / clipEnd.w;
+
+			// direction
+			vec2 dir = ndcEnd.xy - ndcStart.xy;
+
+			// account for clip-space aspect ratio
+			dir.x *= aspect;
+			dir = normalize( dir );
+
+			#ifdef WORLD_UNITS
+
+				// get the offset direction as perpendicular to the view vector
+				vec3 worldDir = normalize( end.xyz - start.xyz );
+				vec3 offset;
+				if ( position.y < 0.5 ) {
+
+					offset = normalize( cross( start.xyz, worldDir ) );
+
+				} else {
+
+					offset = normalize( cross( end.xyz, worldDir ) );
+
+				}
+
+				// sign flip
+				if ( position.x < 0.0 ) offset *= - 1.0;
+
+				float forwardOffset = dot( worldDir, vec3( 0.0, 0.0, 1.0 ) );
+
+				// don't extend the line if we're rendering dashes because we
+				// won't be rendering the endcaps
+				#ifndef USE_DASH
+
+					// extend the line bounds to encompass  endcaps
+					start.xyz += - worldDir * linewidth * 0.5;
+					end.xyz += worldDir * linewidth * 0.5;
+
+					// shift the position of the quad so it hugs the forward edge of the line
+					offset.xy -= dir * forwardOffset;
+					offset.z += 0.5;
+
+				#endif
+
+				// endcaps
+				if ( position.y > 1.0 || position.y < 0.0 ) {
+
+					offset.xy += dir * 2.0 * forwardOffset;
+
+				}
+
+				// adjust for linewidth
+				offset *= linewidth * 0.5;
+
+				// set the world position
+				worldPos = ( position.y < 0.5 ) ? start : end;
+				worldPos.xyz += offset;
+
+				// project the worldpos
+				vec4 clip = projectionMatrix * worldPos;
+
+				// shift the depth of the projected points so the line
+				// segements overlap neatly
+				vec3 clipPose = ( position.y < 0.5 ) ? ndcStart : ndcEnd;
+				clip.z = clipPose.z * clip.w;
+
+			#else
+
+				vec2 offset = vec2( dir.y, - dir.x );
+				// undo aspect ratio adjustment
+				dir.x /= aspect;
+				offset.x /= aspect;
+
+				// sign flip
+				if ( position.x < 0.0 ) offset *= - 1.0;
+
+				// endcaps
+				if ( position.y < 0.0 ) {
+
+					offset += - dir;
+
+				} else if ( position.y > 1.0 ) {
+
+					offset += dir;
+
+				}
+
+				// adjust for linewidth
+				offset *= linewidth;
+
+				// adjust for clip-space to screen-space conversion // maybe resolution should be based on viewport ...
+				offset /= resolution.y;
+
+				// select end
+				vec4 clip = ( position.y < 0.5 ) ? clipStart : clipEnd;
+
+				// back to clip space
+				offset *= clip.w;
+
+				clip.xy += offset;
+
+			#endif
+
+			gl_Position = clip;
+
+			vec4 mvPosition = ( position.y < 0.5 ) ? start : end; // this is an approximation
+
+			#include <logdepthbuf_vertex>
+			#include <clipping_planes_vertex>
+			#include <fog_vertex>
+
+		}
+		`,
+
+	fragmentShader:
+	/* glsl */`
+		uniform vec3 diffuse;
+		uniform float opacity;
+		uniform float linewidth;
+
+		#ifdef USE_DASH
+
+			uniform float dashOffset;
+			uniform float dashSize;
+			uniform float gapSize;
+
+		#endif
+
+		varying float vLineDistance;
+
+		#ifdef WORLD_UNITS
+
+			varying vec4 worldPos;
+			varying vec3 worldStart;
+			varying vec3 worldEnd;
+
+			#ifdef USE_DASH
+
+				varying vec2 vUv;
+
+			#endif
+
+		#else
+
+			varying vec2 vUv;
+
+		#endif
+
+		#include <common>
+		#include <color_pars_fragment>
+		#include <fog_pars_fragment>
+		#include <logdepthbuf_pars_fragment>
+		#include <clipping_planes_pars_fragment>
+
+		vec2 closestLineToLine(vec3 p1, vec3 p2, vec3 p3, vec3 p4) {
+
+			float mua;
+			float mub;
+
+			vec3 p13 = p1 - p3;
+			vec3 p43 = p4 - p3;
+
+			vec3 p21 = p2 - p1;
+
+			float d1343 = dot( p13, p43 );
+			float d4321 = dot( p43, p21 );
+			float d1321 = dot( p13, p21 );
+			float d4343 = dot( p43, p43 );
+			float d2121 = dot( p21, p21 );
+
+			float denom = d2121 * d4343 - d4321 * d4321;
+
+			float numer = d1343 * d4321 - d1321 * d4343;
+
+			mua = numer / denom;
+			mua = clamp( mua, 0.0, 1.0 );
+			mub = ( d1343 + d4321 * ( mua ) ) / d4343;
+			mub = clamp( mub, 0.0, 1.0 );
+
+			return vec2( mua, mub );
+
+		}
+
+		void main() {
+
+			#include <clipping_planes_fragment>
+
+			#ifdef USE_DASH
+
+				if ( vUv.y < - 1.0 || vUv.y > 1.0 ) discard; // discard endcaps
+
+				if ( mod( vLineDistance + dashOffset, dashSize + gapSize ) > dashSize ) discard; // todo - FIX
+
+			#endif
+
+			float alpha = opacity;
+
+			#ifdef WORLD_UNITS
+
+				// Find the closest points on the view ray and the line segment
+				vec3 rayEnd = normalize( worldPos.xyz ) * 1e5;
+				vec3 lineDir = worldEnd - worldStart;
+				vec2 params = closestLineToLine( worldStart, worldEnd, vec3( 0.0, 0.0, 0.0 ), rayEnd );
+
+				vec3 p1 = worldStart + lineDir * params.x;
+				vec3 p2 = rayEnd * params.y;
+				vec3 delta = p1 - p2;
+				float len = length( delta );
+				float norm = len / linewidth;
+
+				#ifndef USE_DASH
+
+					#ifdef USE_ALPHA_TO_COVERAGE
+
+						float dnorm = fwidth( norm );
+						alpha = 1.0 - smoothstep( 0.5 - dnorm, 0.5 + dnorm, norm );
+
+					#else
+
+						if ( norm > 0.5 ) {
+
+							discard;
+
+						}
+
+					#endif
+
+				#endif
+
+			#else
+
+				#ifdef USE_ALPHA_TO_COVERAGE
+
+					// artifacts appear on some hardware if a derivative is taken within a conditional
+					float a = vUv.x;
+					float b = ( vUv.y > 0.0 ) ? vUv.y - 1.0 : vUv.y + 1.0;
+					float len2 = a * a + b * b;
+					float dlen = fwidth( len2 );
+
+					if ( abs( vUv.y ) > 1.0 ) {
+
+						alpha = 1.0 - smoothstep( 1.0 - dlen, 1.0 + dlen, len2 );
+
+					}
+
+				#else
+
+					if ( abs( vUv.y ) > 1.0 ) {
+
+						float a = vUv.x;
+						float b = ( vUv.y > 0.0 ) ? vUv.y - 1.0 : vUv.y + 1.0;
+						float len2 = a * a + b * b;
+
+						if ( len2 > 1.0 ) discard;
+
+					}
+
+				#endif
+
+			#endif
+
+			vec4 diffuseColor = vec4( diffuse, alpha );
+
+			#include <logdepthbuf_fragment>
+			#include <color_fragment>
+
+			gl_FragColor = vec4( diffuseColor.rgb, alpha );
+
+			#include <tonemapping_fragment>
+			#include <encodings_fragment>
+			#include <fog_fragment>
+			#include <premultiplied_alpha_fragment>
+
+		}
+		`
+};
+
+class LineMaterial extends three_module.ShaderMaterial {
+
+	constructor( parameters ) {
+
+		super( {
+
+			type: 'LineMaterial',
+
+			uniforms: three_module.UniformsUtils.clone( three_module.ShaderLib.line.uniforms ),
+
+			vertexShader: three_module.ShaderLib.line.vertexShader,
+			fragmentShader: three_module.ShaderLib.line.fragmentShader,
+
+			clipping: true // required for clipping support
+
+		} );
+
+		Object.defineProperties( this, {
+
+			color: {
+
+				enumerable: true,
+
+				get: function () {
+
+					return this.uniforms.diffuse.value;
+
+				},
+
+				set: function ( value ) {
+
+					this.uniforms.diffuse.value = value;
+
+				}
+
+			},
+
+			worldUnits: {
+
+				enumerable: true,
+
+				get: function () {
+
+					return 'WORLD_UNITS' in this.defines;
+
+				},
+
+				set: function ( value ) {
+
+					if ( value === true ) {
+
+						this.defines.WORLD_UNITS = '';
+
+					} else {
+
+						delete this.defines.WORLD_UNITS;
+
+					}
+
+				}
+
+			},
+
+			linewidth: {
+
+				enumerable: true,
+
+				get: function () {
+
+					return this.uniforms.linewidth.value;
+
+				},
+
+				set: function ( value ) {
+
+					this.uniforms.linewidth.value = value;
+
+				}
+
+			},
+
+			dashed: {
+
+				enumerable: true,
+
+				get: function () {
+
+					return Boolean( 'USE_DASH' in this.defines );
+
+				},
+
+				set( value ) {
+
+					if ( Boolean( value ) !== Boolean( 'USE_DASH' in this.defines ) ) {
+
+						this.needsUpdate = true;
+
+					}
+
+					if ( value === true ) {
+
+						this.defines.USE_DASH = '';
+
+					} else {
+
+						delete this.defines.USE_DASH;
+
+					}
+
+				}
+
+			},
+
+			dashScale: {
+
+				enumerable: true,
+
+				get: function () {
+
+					return this.uniforms.dashScale.value;
+
+				},
+
+				set: function ( value ) {
+
+					this.uniforms.dashScale.value = value;
+
+				}
+
+			},
+
+			dashSize: {
+
+				enumerable: true,
+
+				get: function () {
+
+					return this.uniforms.dashSize.value;
+
+				},
+
+				set: function ( value ) {
+
+					this.uniforms.dashSize.value = value;
+
+				}
+
+			},
+
+			dashOffset: {
+
+				enumerable: true,
+
+				get: function () {
+
+					return this.uniforms.dashOffset.value;
+
+				},
+
+				set: function ( value ) {
+
+					this.uniforms.dashOffset.value = value;
+
+				}
+
+			},
+
+			gapSize: {
+
+				enumerable: true,
+
+				get: function () {
+
+					return this.uniforms.gapSize.value;
+
+				},
+
+				set: function ( value ) {
+
+					this.uniforms.gapSize.value = value;
+
+				}
+
+			},
+
+			opacity: {
+
+				enumerable: true,
+
+				get: function () {
+
+					return this.uniforms.opacity.value;
+
+				},
+
+				set: function ( value ) {
+
+					this.uniforms.opacity.value = value;
+
+				}
+
+			},
+
+			resolution: {
+
+				enumerable: true,
+
+				get: function () {
+
+					return this.uniforms.resolution.value;
+
+				},
+
+				set: function ( value ) {
+
+					this.uniforms.resolution.value.copy( value );
+
+				}
+
+			},
+
+			alphaToCoverage: {
+
+				enumerable: true,
+
+				get: function () {
+
+					return Boolean( 'USE_ALPHA_TO_COVERAGE' in this.defines );
+
+				},
+
+				set: function ( value ) {
+
+					if ( Boolean( value ) !== Boolean( 'USE_ALPHA_TO_COVERAGE' in this.defines ) ) {
+
+						this.needsUpdate = true;
+
+					}
+
+					if ( value === true ) {
+
+						this.defines.USE_ALPHA_TO_COVERAGE = '';
+						this.extensions.derivatives = true;
+
+					} else {
+
+						delete this.defines.USE_ALPHA_TO_COVERAGE;
+						this.extensions.derivatives = false;
+
+					}
+
+				}
+
+			}
+
+		} );
+
+		this.setValues( parameters );
+
+	}
+
+}
+
+LineMaterial.prototype.isLineMaterial = true;
+
+
+
+;// CONCATENATED MODULE: ./src/js/jsm/lines/LineSegments2.js
+
+
+
+
+const _start = new three_module.Vector3();
+const _end = new three_module.Vector3();
+
+const _start4 = new three_module.Vector4();
+const _end4 = new three_module.Vector4();
+
+const _ssOrigin = new three_module.Vector4();
+const _ssOrigin3 = new three_module.Vector3();
+const _mvMatrix = new three_module.Matrix4();
+const _line = new three_module.Line3();
+const _closestPoint = new three_module.Vector3();
+
+const LineSegments2_box = new three_module.Box3();
+const _sphere = new three_module.Sphere();
+const _clipToWorldVector = new three_module.Vector4();
+
+// Returns the margin required to expand by in world space given the distance from the camera,
+// line width, resolution, and camera projection
+function getWorldSpaceHalfWidth( camera, distance, lineWidth, resolution ) {
+
+	// transform into clip space, adjust the x and y values by the pixel width offset, then
+	// transform back into world space to get world offset. Note clip space is [-1, 1] so full
+	// width does not need to be halved.
+	_clipToWorldVector.set( 0, 0, - distance, 1.0 ).applyMatrix4( camera.projectionMatrix );
+	_clipToWorldVector.multiplyScalar( 1.0 / _clipToWorldVector.w );
+	_clipToWorldVector.x = lineWidth / resolution.width;
+	_clipToWorldVector.y = lineWidth / resolution.height;
+	_clipToWorldVector.applyMatrix4( camera.projectionMatrixInverse );
+	_clipToWorldVector.multiplyScalar( 1.0 / _clipToWorldVector.w );
+
+	return Math.abs( Math.max( _clipToWorldVector.x, _clipToWorldVector.y ) );
+
+}
+
+class LineSegments2 extends three_module.Mesh {
+
+	constructor( geometry = new LineSegmentsGeometry(), material = new LineMaterial( { color: Math.random() * 0xffffff } ) ) {
+
+		super( geometry, material );
+
+		this.type = 'LineSegments2';
+
+	}
+
+	// for backwards-compatability, but could be a method of LineSegmentsGeometry...
+
+	computeLineDistances() {
+
+		const geometry = this.geometry;
+
+		const instanceStart = geometry.attributes.instanceStart;
+		const instanceEnd = geometry.attributes.instanceEnd;
+		const lineDistances = new Float32Array( 2 * instanceStart.count );
+
+		for ( let i = 0, j = 0, l = instanceStart.count; i < l; i ++, j += 2 ) {
+
+			_start.fromBufferAttribute( instanceStart, i );
+			_end.fromBufferAttribute( instanceEnd, i );
+
+			lineDistances[ j ] = ( j === 0 ) ? 0 : lineDistances[ j - 1 ];
+			lineDistances[ j + 1 ] = lineDistances[ j ] + _start.distanceTo( _end );
+
+		}
+
+		const instanceDistanceBuffer = new three_module.InstancedInterleavedBuffer( lineDistances, 2, 1 ); // d0, d1
+
+		geometry.setAttribute( 'instanceDistanceStart', new three_module.InterleavedBufferAttribute( instanceDistanceBuffer, 1, 0 ) ); // d0
+		geometry.setAttribute( 'instanceDistanceEnd', new three_module.InterleavedBufferAttribute( instanceDistanceBuffer, 1, 1 ) ); // d1
+
+		return this;
+
+	}
+
+	raycast( raycaster, intersects ) {
+
+		if ( raycaster.camera === null ) {
+
+			console.error( 'LineSegments2: "Raycaster.camera" needs to be set in order to raycast against LineSegments2.' );
+
+		}
+
+		const threshold = ( raycaster.params.Line2 !== undefined ) ? raycaster.params.Line2.threshold || 0 : 0;
+
+		const ray = raycaster.ray;
+		const camera = raycaster.camera;
+		const projectionMatrix = camera.projectionMatrix;
+
+		const matrixWorld = this.matrixWorld;
+		const geometry = this.geometry;
+		const material = this.material;
+		const resolution = material.resolution;
+		const lineWidth = material.linewidth + threshold;
+
+		const instanceStart = geometry.attributes.instanceStart;
+		const instanceEnd = geometry.attributes.instanceEnd;
+
+		// camera forward is negative
+		const near = - camera.near;
+
+		//
+
+		// check if we intersect the sphere bounds
+		if ( geometry.boundingSphere === null ) {
+
+			geometry.computeBoundingSphere();
+
+		}
+
+		_sphere.copy( geometry.boundingSphere ).applyMatrix4( matrixWorld );
+		const distanceToSphere = Math.max( camera.near, _sphere.distanceToPoint( ray.origin ) );
+
+		// increase the sphere bounds by the worst case line screen space width
+		const sphereMargin = getWorldSpaceHalfWidth( camera, distanceToSphere, lineWidth, resolution );
+		_sphere.radius += sphereMargin;
+
+		if ( raycaster.ray.intersectsSphere( _sphere ) === false ) {
+
+			return;
+
+		}
+
+		//
+
+		// check if we intersect the box bounds
+		if ( geometry.boundingBox === null ) {
+
+			geometry.computeBoundingBox();
+
+		}
+
+		LineSegments2_box.copy( geometry.boundingBox ).applyMatrix4( matrixWorld );
+		const distanceToBox = Math.max( camera.near, LineSegments2_box.distanceToPoint( ray.origin ) );
+
+		// increase the box bounds by the worst case line screen space width
+		const boxMargin = getWorldSpaceHalfWidth( camera, distanceToBox, lineWidth, resolution );
+		LineSegments2_box.max.x += boxMargin;
+		LineSegments2_box.max.y += boxMargin;
+		LineSegments2_box.max.z += boxMargin;
+		LineSegments2_box.min.x -= boxMargin;
+		LineSegments2_box.min.y -= boxMargin;
+		LineSegments2_box.min.z -= boxMargin;
+
+		if ( raycaster.ray.intersectsBox( LineSegments2_box ) === false ) {
+
+			return;
+
+		}
+
+		//
+
+		// pick a point 1 unit out along the ray to avoid the ray origin
+		// sitting at the camera origin which will cause "w" to be 0 when
+		// applying the projection matrix.
+		ray.at( 1, _ssOrigin );
+
+		// ndc space [ - 1.0, 1.0 ]
+		_ssOrigin.w = 1;
+		_ssOrigin.applyMatrix4( camera.matrixWorldInverse );
+		_ssOrigin.applyMatrix4( projectionMatrix );
+		_ssOrigin.multiplyScalar( 1 / _ssOrigin.w );
+
+		// screen space
+		_ssOrigin.x *= resolution.x / 2;
+		_ssOrigin.y *= resolution.y / 2;
+		_ssOrigin.z = 0;
+
+		_ssOrigin3.copy( _ssOrigin );
+
+		_mvMatrix.multiplyMatrices( camera.matrixWorldInverse, matrixWorld );
+
+		for ( let i = 0, l = instanceStart.count; i < l; i ++ ) {
+
+			_start4.fromBufferAttribute( instanceStart, i );
+			_end4.fromBufferAttribute( instanceEnd, i );
+
+			_start4.w = 1;
+			_end4.w = 1;
+
+			// camera space
+			_start4.applyMatrix4( _mvMatrix );
+			_end4.applyMatrix4( _mvMatrix );
+
+			// skip the segment if it's entirely behind the camera
+			var isBehindCameraNear = _start4.z > near && _end4.z > near;
+			if ( isBehindCameraNear ) {
+
+				continue;
+
+			}
+
+			// trim the segment if it extends behind camera near
+			if ( _start4.z > near ) {
+
+				const deltaDist = _start4.z - _end4.z;
+				const t = ( _start4.z - near ) / deltaDist;
+				_start4.lerp( _end4, t );
+
+			} else if ( _end4.z > near ) {
+
+				const deltaDist = _end4.z - _start4.z;
+				const t = ( _end4.z - near ) / deltaDist;
+				_end4.lerp( _start4, t );
+
+			}
+
+			// clip space
+			_start4.applyMatrix4( projectionMatrix );
+			_end4.applyMatrix4( projectionMatrix );
+
+			// ndc space [ - 1.0, 1.0 ]
+			_start4.multiplyScalar( 1 / _start4.w );
+			_end4.multiplyScalar( 1 / _end4.w );
+
+			// screen space
+			_start4.x *= resolution.x / 2;
+			_start4.y *= resolution.y / 2;
+
+			_end4.x *= resolution.x / 2;
+			_end4.y *= resolution.y / 2;
+
+			// create 2d segment
+			_line.start.copy( _start4 );
+			_line.start.z = 0;
+
+			_line.end.copy( _end4 );
+			_line.end.z = 0;
+
+			// get closest point on ray to segment
+			const param = _line.closestPointToPointParameter( _ssOrigin3, true );
+			_line.at( param, _closestPoint );
+
+			// check if the intersection point is within clip space
+			const zPos = three_module.MathUtils.lerp( _start4.z, _end4.z, param );
+			const isInClipSpace = zPos >= - 1 && zPos <= 1;
+
+			const isInside = _ssOrigin3.distanceTo( _closestPoint ) < lineWidth * 0.5;
+
+			if ( isInClipSpace && isInside ) {
+
+				_line.start.fromBufferAttribute( instanceStart, i );
+				_line.end.fromBufferAttribute( instanceEnd, i );
+
+				_line.start.applyMatrix4( matrixWorld );
+				_line.end.applyMatrix4( matrixWorld );
+
+				const pointOnLine = new three_module.Vector3();
+				const point = new three_module.Vector3();
+
+				ray.distanceSqToSegment( _line.start, _line.end, point, pointOnLine );
+
+				intersects.push( {
+
+					point: point,
+					pointOnLine: pointOnLine,
+					distance: ray.origin.distanceTo( point ),
+
+					object: this,
+					face: null,
+					faceIndex: i,
+					uv: null,
+					uv2: null,
+
+				} );
+
+			}
+
+		}
+
+	}
+
+}
+
+LineSegments2.prototype.isLineSegments2 = true;
+
+
+
 ;// CONCATENATED MODULE: ./src/js/controls/localization.js
+
+
+
+
 
 
 
@@ -57238,35 +58568,9 @@ var downloadjs_download = __webpack_require__(3729);
 const pos = new threeplugins/* THREE.Vector3 */.J.Vector3();
 const folder_name = constants/* CONSTANTS.FOLDERS.localization */.t.FOLDERS.localization || 'Electrode Localization';
 
-const raycast_volume = raycast_volume_geneator();
-
 const COL_SELECTED = 0xff0000,
       COL_ENABLED = 0xfa9349,
       COL_DISABLED = 0xf1f2d5;
-
-class TextTexture extends threeplugins/* THREE.Texture */.J.Texture {
-
-  constructor( text, mapping, wrapS, wrapT, magFilter, minFilter, format,
-    type, anisotropy, font = "Courier", size = 32
-  ) {
-
-    const canvas = document.createElement("canvas");
-    super( canvas, mapping, wrapS, wrapT, magFilter, minFilter, format, type, anisotropy );
-
-    this._text = text || " ";
-    this._size = Math.ceil( size );
-    this._canvas = canvas;
-    this._canvas.height = this._size;
-    this._canvas.width = Math.ceil( this._text.length * this._size * 0.6 );
-    this._context = this._canvas.getContext("2d");
-    this._context.font = `${this._size}px ${font}`;
-    this._context.fillText( this._text, 0, this._size * 26 / 32);
-
-		this.needsUpdate = true;
-
-	}
-
-}
 
 function atlas_label_from_index(index, canvas){
   const fslut = canvas.global_data("__global_data__.FSColorLUT");
@@ -57363,109 +58667,411 @@ function atlas_label(pos_array, canvas){
 }
 // window.atlas_label = atlas_label;
 
-function add_electrode(scode, num, pos, canvas){
-  const group_name = `group_Electrodes (${scode})`;
 
-  const pos_array = pos.toArray();
-  const fs_label = atlas_label(pos_array, canvas)[0];
-  const regex = /(l|r)h\-/g;
-  const m = regex.exec(fs_label);
+const pal = [0x1874CD, 0x1F75C6, 0x2677BF, 0x2E78B9, 0x357AB2, 0x3C7BAC, 0x447DA5, 0x4B7E9F, 0x528098, 0x598292, 0x61838B, 0x688585, 0x70867E, 0x778878, 0x7E8971, 0x858B6B, 0x8D8C64, 0x948E5E, 0x9B9057, 0xA39151, 0xAA934A, 0xB29444, 0xB9963D, 0xC09737, 0xC89930, 0xCF9A2A, 0xD69C23, 0xDD9E1D, 0xE59F16, 0xECA110, 0xF3A209, 0xFBA403, 0xFFA300, 0xFFA000, 0xFF9D00, 0xFF9A00, 0xFF9700, 0xFF9400, 0xFF9100, 0xFF8E00, 0xFF8B00, 0xFF8800, 0xFF8500, 0xFF8100, 0xFF7E00, 0xFF7B00, 0xFF7800, 0xFF7500, 0xFF7200, 0xFF6F00, 0xFF6C00, 0xFF6900, 0xFF6600, 0xFF6300, 0xFF6000, 0xFF5D00, 0xFF5A00, 0xFF5700, 0xFF5400, 0xFF5100, 0xFF4E00, 0xFF4B00, 0xFF4800, 0xFF4500];
 
-  let hemisphere;
-  if( m && m.length >= 2 ){
-    hemisphere = m[1] == "r" ? "right" : "left";
-  } else {
-    let ac_pos = canvas.state_data.get("anterior_commissure");
-    if( ac_pos && ac_pos.isVector3 ){
-      ac_pos = ac_pos.x;
+class LocElectrode {
+  constructor(subject_code, localization_order, initial_position, canvas,
+              electrode_scale = 1, text_scale = 1.0) {
+    this.isLocElectrode = true;
+    // temp vector 3
+    this.__vec3 = new threeplugins/* THREE.Vector3 */.J.Vector3().set( 0, 0, 0 );
+    this.subject_code = subject_code;
+    this.localization_order = localization_order;
+    this._canvas = canvas;
+    if(Array.isArray(initial_position)){
+      this.initial_position = [...initial_position];
     } else {
-      ac_pos = 0;
+      this.initial_position = initial_position.toArray();
     }
-    hemisphere = pos.x > ac_pos ? "right" : "left";
+    const init_pos_clone = [
+      this.initial_position[0],
+      this.initial_position[1],
+      this.initial_position[2]
+    ];
+
+    // get fs Label
+    this.fs_label = atlas_label(init_pos_clone, canvas)[0];
+    const regex = /(l|r)h\-/g;
+    const m = regex.exec(this.fs_label);
+
+    if( m && m.length >= 2 ){
+      this.Hemisphere = m[1] == "r" ? "right" : "left";
+    } else {
+      let ac_pos = canvas.state_data.get("anterior_commissure");
+      if( ac_pos && ac_pos.isVector3 ){
+        ac_pos = ac_pos.x;
+      } else {
+        ac_pos = 0;
+      }
+      this.Hemisphere = pos.x > ac_pos ? "right" : "left";
+    }
+
+    this.Label = "NoLabel" + this.localization_order;
+    this.Electrode = "";
+    this.FSIndex = undefined;
+    this._orig_name = `${this.subject_code}, ${this.localization_order} - ${this.Label}`;
+    this._scale = electrode_scale;
+    this._text_scale = text_scale;
+
+    const inst = canvas.add_object({
+      "name": this._orig_name,
+      "type": "sphere",
+      "time_stamp": [],
+      "position": init_pos_clone,
+      "value": null,
+      "clickable": true,
+      "layer": 0,
+      "group":{
+        "group_name": `group_Electrodes (${this.subject_code})`,
+        "group_layer": 0,
+        "group_position":[0,0,0]
+      },
+      "use_cache":false,
+      "custom_info": "",
+      "subject_code": this.subject_code,
+      "radius": 1,
+      "width_segments": 10,
+      "height_segments": 6,
+      "is_electrode":true,
+      "is_surface_electrode": false,
+      "use_template":false,
+      "surface_type": 'pial',
+      "hemisphere": this.Hemisphere,
+      "vertex_number": -1,
+      "sub_cortical": true,
+      "search_geoms": null
+    });
+
+
+    this.instance = inst;
+    this.object = inst.object;
+    this.object.material.color.set( COL_ENABLED );
+
+    const map = new threeplugins/* THREE.TextTexture */.J.TextTexture( `${localization_order}` );
+    const material = new threeplugins/* THREE.SpriteMaterial */.J.SpriteMaterial( {
+      map: map,
+      depthTest : false,
+      depthWrite : false
+    } );
+    const sprite = new threeplugins/* THREE.Sprite2 */.J.Sprite2( material );
+    this.object.add( sprite );
+    this._map = map;
+
+    this.object.userData.dispose = () => {
+      sprite.removeFromParent();
+      sprite.material.map.dispose();
+      sprite.geometry.dispose();
+      sprite.material.dispose();
+      this.instance.dispose();
+    };
+    this.object.userData.localization_instance = this;
+    // this.object.scale.set( this._scale, this._scale, this._scale );
+
+
+    // Add line to indicate shift
+    const line_geometry = new LineSegmentsGeometry();
+    line_geometry.setPositions( [
+      0,0,0,
+      0,0,0
+    ] );
+    const line_material = new LineMaterial( {
+      color: 0x0000ff,
+      // depthTest: false,
+      linewidth: 3,
+      side: threeplugins/* THREE.DoubleSide */.J.DoubleSide
+    } );
+    const line = new LineSegments2( line_geometry, line_material );
+    this._line = line;
+    line.computeLineDistances();
+    line.scale.set( 1/this._scale , 1/this._scale , 1/this._scale );
+    line_material.resolution.set(
+      this._canvas.client_width || window.innerWidth,
+      this._canvas.client_height || window.innerHeight
+    );
+    this.object.add( line );
+
+
+
+
+    this.update_scale();
+    this._enabled = true;
   }
 
-  const el = canvas.add_object({
-    "name": `${scode}, ${num} - NEW_ELECTRODE`,
-    "type": "sphere",
-    "time_stamp": [],
-    "position": pos_array,
-    "value": null,
-    "clickable": true,
-    "layer": 0,
-    "group":{
-      "group_name": group_name,
-      "group_layer": 0,
-      "group_position":[0,0,0]
-    },
-    "use_cache":false,
-    "custom_info": "",
-    "subject_code": scode,
-    "radius": 1.5,
-    "width_segments": 10,
-    "height_segments": 6,
-    "is_electrode":true,
-    "is_surface_electrode": false,
-    "use_template":false,
-    "surface_type": 'pial',
-    "hemisphere": hemisphere,
-    "vertex_number": -1,
-    "sub_cortical": true,
-    "search_geoms": null
-  });
-  el._enabled = true;
-  el._fs_label = ( index ) => {
+  dispose() {
+    this.object.userData.dispose();
+    try {
+      const collection = this._canvas.electrodes.get(this.subject_code);
+      if( collection.hasOwnProperty(this._orig_name) ){
+        delete collection[ this._orig_name ];
+      }
+    } catch (e) {}
+  }
+
+  get_fs_label( index ){
     if( index !== undefined ){
-      return( atlas_label_from_index(index, canvas) );
+      return( atlas_label_from_index(index, this._canvas) );
+    } else if ( this.FSIndex !== undefined ) {
+      return( atlas_label_from_index(this.FSIndex, this._canvas) );
     } else {
-      return( atlas_label(el._params.position, canvas) );
+      const pos = this.instance._params.position;
+      return( atlas_label(pos, this._canvas) );
     }
-  };
-  el._localization_params = {};
-  el._localization_params.localizationOrder = num;
-  el.object.material.color.set( COL_ENABLED );
+  }
 
-  const map = new TextTexture( `${num}` );
-  const material = new threeplugins/* THREE.SpriteMaterial */.J.SpriteMaterial( {
-    map: map,
-    depthTest : false,
-    depthWrite : false
-  } );
-  const sprite = new threeplugins/* THREE.Sprite */.J.Sprite( material );
-  sprite.scale.set(2,2,2);
-  el.object.add( sprite );
+  update_label( label ){
+    this.Label = label || ("N/A " + this.localization_order);
+    const name = `${this.subject_code}, ${this.localization_order} - ${this.Label}`;
 
-  el.object.userData.dispose = () => {
-    sprite.removeFromParent();
-    sprite.material.map.dispose();
-    sprite.geometry.dispose();
-    sprite.material.dispose();
-    el.dispose();
-  };
+    this._map.draw_text( `${this.localization_order}-${this.Label}` );
+    this.instance._params.name = name;
+  }
 
-  return( el );
-}
+  update( params ){
+    const g = this.instance._params;
+    for( let k in params ){
+      switch (k) {
+        case 'Electrode':
+        case 'FSIndex':
+          this[k] = params[k];
+          break;
+        case 'Label':
+          this.update_label( params.Label );
+          break;
+        case 'SurfaceElectrode':
+          if( params[k] === "TRUE" || params[k] === true ){
+            g.is_surface_electrode = true;
+          } else {
+            g.is_surface_electrode = false;
+          }
+          break;
+        case 'SurfaceType':
+          g.surface_type = params[k];
+          break;
+        case 'Radius':
+          g.radius = parseFloat(params[k]);
+          this.update_scale();
+          break;
+        case 'VertexNumber':
+          g.vertex_number = parseInt(params[k]);
+          break;
+        case 'Hemisphere':
+          this.Hemisphere = params[k];
+          g.hemisphere = params[k];
+          break;
+        case 'Notes':
+          g.custom_info = params[k];
+          break;
+        default:
+          // skip
+      }
+    }
+  }
 
-function electrode_from_ct( inst, canvas ){
-  // const inst = this.current_voxel_type();
-  if( !inst ){ return; }
-  canvas.set_raycaster();
-  const res = raycast_volume(
-    canvas.mouse_raycaster.ray.origin,
-    canvas.mouse_raycaster.ray.direction,
-    new threeplugins/* THREE.Vector3 */.J.Vector3().fromArray( inst._cube_dim ),
-    new threeplugins/* THREE.Vector3 */.J.Vector3().set(
+  update_scale( scale, text_scale ){
+    if( scale ){
+      this._scale = scale;
+    }
+    if( text_scale ){
+      this._text_scale = text_scale;
+    }
+    const v = this._scale * this.instance._params.radius;
+    this.object.scale.set( v, v, v );
+    this._map.update_scale( this._text_scale / v );
+    this._line.scale.set( 1 / v, 1 / v, 1 / v );
+  }
+
+  update_color( color ){
+    if( color ){
+      this.object.material.color.set( color );
+    } else {
+      if(this.enabled()){
+        this.object.material.color.set( COL_ENABLED );
+      } else {
+        this.object.material.color.set( COL_DISABLED );
+      }
+    }
+  }
+
+  reset_position() {
+    this.object.position.fromArray( this.initial_position );
+    this.instance._params.position[0] = this.initial_position[0];
+    this.instance._params.position[1] = this.initial_position[1];
+    this.instance._params.position[2] = this.initial_position[2];
+    this.update_line();
+  }
+
+  update_line() {
+    const positions = this._line.geometry.attributes.position;
+    const dst = this.__vec3.fromArray( this.initial_position ).sub( this.object.position );
+
+    //__canvas.object_chosen.position.set(0,0,0)
+    const inst_start = this._line.geometry.attributes.instanceStart.data.array,
+          inst_end   = this._line.geometry.attributes.instanceEnd.data.array;
+
+    inst_start[3] = dst.x;
+    inst_start[4] = dst.y;
+    inst_start[5] = dst.z;
+    inst_end[3] = dst.x;
+    inst_end[4] = dst.y;
+    inst_end[5] = dst.z;
+    this._line.geometry.attributes.instanceStart.needsUpdate = true;
+    this._line.geometry.attributes.instanceEnd.needsUpdate = true;
+
+    /*
+    positions.array[0] = dst.x;
+    positions.array[1] = dst.y;
+    positions.array[2] = dst.z;
+    positions.needsUpdate = true;
+    */
+
+    // update length
+    let shift_idx = Math.floor(dst.length() * 10);
+    if( shift_idx > 63 ){
+      shift_idx = 63;
+    }
+    this._line.material.color.set( pal[shift_idx] );
+    this.update_scale();
+  }
+
+  enabled() {
+    return( this._enabled === true );
+  }
+  enable() {
+    this.update_color( COL_ENABLED );
+    this._enabled = true;
+  }
+  disable() {
+    this.update_color( COL_DISABLED );
+    this._enabled = false;
+  }
+
+  set_mode( mode ) {
+    this.mode = mode;
+  }
+
+  get_volume_instance(){
+    const atlas_type = this._canvas.state_data.get("atlas_type") || "none",
+          sub = this.subject_code,
+          inst = this._canvas.threebrain_instances.get(`Atlas - ${atlas_type} (${sub})`);
+    if( inst && inst.isDataCube2 ){
+      return( inst );
+    }
+    return;
+  }
+
+  adjust() {
+    if( this.mode !== "CT/volume" ){ return; }
+    const inst = this.get_volume_instance();
+    if( !inst ){ return; }
+
+    const matrix_ = inst.object.parent.matrixWorld.clone(),
+          matrix_inv = matrix_.clone().invert();
+
+    const margin_voxels = new threeplugins/* THREE.Vector3 */.J.Vector3().fromArray( inst._cube_dim );
+    const margin_lengths = new threeplugins/* THREE.Vector3 */.J.Vector3().set(
       inst._margin_length.xLength,
       inst._margin_length.yLength,
-      inst._margin_length.zLength,
-    ),
-    inst._color_texture.image.data,
-    2
-  );
-  pos.x = res[3];
-  pos.y = res[4];
-  pos.z = res[5];
+      inst._margin_length.zLength
+    );
+    const f = new threeplugins/* THREE.Vector3 */.J.Vector3().set(
+      margin_lengths.x / margin_voxels.x,
+      margin_lengths.y / margin_voxels.y,
+      margin_lengths.z / margin_voxels.z
+    );
+    const mx = margin_voxels.x,
+          my = margin_voxels.y,
+          mz = margin_voxels.z;
+    const ct_data = inst._cube_values;
 
-  return ( pos );
+    const delta = 4;
+    const pos = new threeplugins/* THREE.Vector3 */.J.Vector3(),
+          pos0 = new threeplugins/* THREE.Vector3 */.J.Vector3();
+          // pos1 = new THREE.Vector3();
+
+    // get position
+    const position = this.instance._params.position;
+    pos0.fromArray( position );
+    pos.fromArray( position ).applyMatrix4( matrix_inv );
+
+    /*
+    (i+0.5) * f.x - l_x / 2,
+    (j+0.5) * f.y - l_y / 2,
+    (k+0.5) * f.z - l_z / 2
+    *?
+
+    let i = ( position[0] + ( margin_lengths.x - 1 ) / 2 ) / f.x;
+    let j = ( position[1] + ( margin_lengths.y - 1 ) / 2 ) / f.y;
+    let k = ( position[2] + ( margin_lengths.z - 1 ) / 2 ) / f.z;
+    */
+    let i = ( pos.x + ( margin_lengths.x ) / 2 ) / f.x - 0.5;
+    let j = ( pos.y + ( margin_lengths.y ) / 2 ) / f.y - 0.5;
+    let k = ( pos.z + ( margin_lengths.z ) / 2 ) / f.z - 0.5;
+
+    i = Math.round( i );
+    j = Math.round( j );
+    k = Math.round( k );
+
+    if( i < 0 ){ i = 0; }
+    if( i >= mx ){ i = mx - 1; }
+    if( j < 0 ){ k = 0; }
+    if( j >= my ){ j = my - 1; }
+    if( k < 0 ){ k = 0; }
+    if( k >= mz ){ k = mz - 1; }
+
+    const new_ijk = [0, 0, 0];
+    let thred = ct_data[ i + j * mx + k * mx * my ];
+    let tmp, total_v = 0;
+    for(let i0 = Math.max(0, i - delta); i0 < Math.min(i + delta, mx); i0++ ) {
+      for(let j0 = Math.max(0, j - delta); j0 < Math.min(j + delta, my); j0++ ) {
+        for(let k0 = Math.max(0, k - delta); k0 < Math.min(k + delta, mz); k0++ ) {
+          tmp = ct_data[ i0 + j0 * mx + k0 * mx * my ];
+          if( tmp >= thred ) {
+            total_v += tmp;
+            new_ijk[0] += tmp * i0;
+            new_ijk[1] += tmp * j0;
+            new_ijk[2] += tmp * k0;
+          }
+        }
+      }
+    }
+    if( total_v <= 0 ){ return; }
+    new_ijk[0] /= total_v;
+    new_ijk[1] /= total_v;
+    new_ijk[2] /= total_v;
+
+
+    /*
+    let i = ( pos.x + ( margin_lengths.x ) / 2 ) / f.x - 0.5;
+    let j = ( pos.y + ( margin_lengths.y ) / 2 ) / f.y - 0.5;
+    let k = ( pos.z + ( margin_lengths.z ) / 2 ) / f.z - 0.5;
+    */
+    pos.x = (new_ijk[0] + 0.5) * f.x - ( margin_lengths.x ) / 2;
+    pos.y = (new_ijk[1] + 0.5) * f.y - ( margin_lengths.y ) / 2;
+    pos.z = (new_ijk[2] + 0.5) * f.z - ( margin_lengths.z ) / 2;
+
+    // reverse back
+    pos.applyMatrix4( matrix_ );
+
+
+    if(this.__interpolate_direction && this.__interpolate_direction.isVector3) {
+      // already normalized
+      const interp_dir = this.__interpolate_direction.clone();
+
+      // reduce moving along interpolate_direction
+      pos.copy( pos ).sub( pos0 );
+      const inner_prod = pos.dot( interp_dir );
+      pos.sub( interp_dir.multiplyScalar( inner_prod * 0.9 ) ).add( pos0 );
+    }
+
+    position[0] = pos.x;
+    position[1] = pos.y;
+    position[2] = pos.z;
+
+    this.object.position.copy( pos );
+    this.update_line();
+  }
+
 }
 
 function electrode_from_slice( scode, canvas ){
@@ -57492,12 +59098,14 @@ function electrode_line_from_ct( inst, canvas, electrodes, size ){
   if( !inst ){ return; }
   if( electrodes.length < 2 ){ return; }
   if( size <= 2 ){ return; }
-  const margin_nvoxels = new threeplugins/* THREE.Vector3 */.J.Vector3().fromArray( inst._cube_dim );
-  const margin_lengths = new threeplugins/* THREE.Vector3 */.J.Vector3().set(
+  /*
+  const margin_nvoxels = new THREE.Vector3().fromArray( inst._cube_dim );
+  const margin_lengths = new THREE.Vector3().set(
     inst._margin_length.xLength,
     inst._margin_length.yLength,
     inst._margin_length.zLength
   );
+  */
   const src = canvas.main_camera.position;
   const dst = new threeplugins/* THREE.Vector3 */.J.Vector3();
   electrodes[electrodes.length - 2].object.getWorldPosition( dst );
@@ -57510,7 +59118,6 @@ function electrode_line_from_ct( inst, canvas, electrodes, size ){
   const est = new threeplugins/* THREE.Vector3 */.J.Vector3();
 
   const dir = new threeplugins/* THREE.Vector3 */.J.Vector3();
-  let res;
   const re = [];
   for( let ii = 1; ii < n; ii++ ){
 
@@ -57518,23 +59125,35 @@ function electrode_line_from_ct( inst, canvas, electrodes, size ){
     est.copy( dst ).add( tmp );
     dir.copy( est ).sub( src ).normalize();
 
-    for( let delta = 2; delta < 100; delta += 2 ){
+    // adjust
+
+    for( let delta = 0.5; delta < 100; delta += 0.5 ){
+      const res = intersect_volume(src, dir, inst, canvas, delta, false);
+      if(!isNaN(res.x) && res.distanceTo(est) < 10 + delta / 10 ){
+        re.push( res.clone() );
+        break;
+      }
+      /*
       res = raycast_volume(
         src, dir, margin_nvoxels, margin_lengths,
         inst._color_texture.image.data,
         delta
       );
       if( res && res.length >= 6 && !isNaN( res[3] )){
-        let est1 = new threeplugins/* THREE.Vector3 */.J.Vector3( res[3], res[4], res[5] );
+        let est1 = new THREE.Vector3( res[3], res[4], res[5] );
         if( est1.distanceTo(est) < 10 + delta / 10 ){
           re.push(est1);
           break;
         }
       }
+      */
     }
   }
 
-  return( re );
+  return({
+    positions : re,
+    direction : step
+  });
 }
 
 function electrode_line_from_slice( canvas, electrodes, size ){
@@ -57566,7 +59185,10 @@ function electrode_line_from_slice( canvas, electrodes, size ){
     re.push( new threeplugins/* THREE.Vector3 */.J.Vector3().copy(est) );
   }
 
-  return( re );
+  return({
+    positions : re,
+    direction : step
+  });
 }
 
 function register_controls_localization( THREEBRAIN_PRESETS ){
@@ -57576,12 +59198,9 @@ function register_controls_localization( THREEBRAIN_PRESETS ){
     const scode = this.canvas.state_data.get("target_subject");
     const collection = this.canvas.electrodes.get(scode) || {};
     electrodes.forEach((el) => {
-      try {
-        delete collection[ el.name ];
-      } catch (e) {}
-      el.object.userData.dispose();
+      el.dispose();
     });
-    this.__localize_electrode_list.length = 0;
+    electrodes.length = 0;
     this.canvas.switch_subject();
 
     if(update_shiny && this.shiny){
@@ -57598,14 +59217,15 @@ function register_controls_localization( THREEBRAIN_PRESETS ){
     if(!edit_mode){
       const edit_mode = this.gui.get_controller('Edit Mode', folder_name).getValue();
     }
+    let electrode_size = this.gui.get_controller('Electrode Scale', folder_name).getValue() || 1.0;
+    let text_size = this.gui.get_controller('Text Scale', folder_name).getValue() || 1.0;
     if(edit_mode === "disabled" ||
        edit_mode === "refine"){ return; }
 
-    const el = add_electrode(
-      scode, electrodes.length + 1,
-      new threeplugins/* THREE.Vector3 */.J.Vector3().set(x, y, z), this.canvas
-    );
-    el._mode = edit_mode;
+    const el = new LocElectrode(
+      scode, electrodes.length + 1, [x,y,z],
+      this.canvas, electrode_size, text_size);
+    el.set_mode( edit_mode );
     electrodes.push( el );
     this.canvas.switch_subject();
 
@@ -57624,47 +59244,11 @@ function register_controls_localization( THREEBRAIN_PRESETS ){
 
     const _regexp = new RegExp(`^${scode}, ([0-9]+) \\- (.*)$`);
 
-    electrodes.forEach((inst) => {
-      const loc_params = inst._localization_params;
-      const localization_order = loc_params.localizationOrder;
+    electrodes.forEach((el) => {
+
+      const localization_order = el.localization_order;
       if(localization_order == which){
-        const g = inst.object.userData.construct_params;
-        if(!inst._localization_params){
-          inst._localization_params = {};
-        }
-        for( let k in params ){
-          switch (k) {
-            case 'Electrode':
-            case 'FSIndex':
-            case 'Label':
-              loc_params[k] = params[k];
-              break;
-            case 'SurfaceElectrode':
-              if( params[k] === "TRUE" || params[k] == true ){
-                g.is_surface_electrode = true;
-              } else {
-                g.is_surface_electrode = false;
-              }
-              break;
-            case 'SurfaceType':
-              g.surface_type = params[k];
-              break;
-            case 'Radius':
-              g.radius = params[k];
-              break;
-            case 'VertexNumber':
-              g.vertex_number = params[k];
-              break;
-            case 'Hemisphere':
-              g.hemisphere = params[k];
-              break;
-            case 'Notes':
-              g.custom_info = params[k];
-              break;
-            default:
-              // skip
-          }
-        }
+        el.update( params );
       }
 
     });
@@ -57686,26 +59270,21 @@ function register_controls_localization( THREEBRAIN_PRESETS ){
     }).onChange((v) => {
 
       if( !v ){ return; }
-      if( refine_electrode && refine_electrode.isThreeBrainObject &&
-          (0,sphere/* is_electrode */.OK)( refine_electrode.object )){
-        if( refine_electrode._enabled ){
-          refine_electrode.object.material.color.set( COL_ENABLED );
-        } else {
-          refine_electrode.object.material.color.set( COL_DISABLED );
-        }
-
+      if( refine_electrode && refine_electrode.isLocElectrode ){
+        // reset color
+        refine_electrode.update_color();
         refine_electrode = null;
       }
       this.gui.hide_item([
         ' - tkrRAS', ' - MNI305', ' - T1 RAS', 'Interpolate Size',
-        'Interpolate from Recently Added',
+        'Interpolate from Recently Added', 'Reset Highlighted',
         'Auto-Adjust Highlighted', 'Auto-Adjust All'
       ], folder_name);
       if( v === 'disabled' ){ return; }
       if( v === 'refine' ) {
         this.gui.show_item([
           ' - tkrRAS', ' - MNI305', ' - T1 RAS',
-          'Auto-Adjust Highlighted', 'Auto-Adjust All'
+          'Auto-Adjust Highlighted', 'Auto-Adjust All', 'Reset Highlighted'
         ], folder_name);
       } else {
         this.gui.show_item([
@@ -57718,18 +59297,39 @@ function register_controls_localization( THREEBRAIN_PRESETS ){
 
     });
 
+    const elec_size = this.gui.add_item( 'Electrode Scale', 1.0, { folder_name: folder_name })
+      .min(0.5).max(2).step(0.1)
+      .onChange((v) => {
+
+        electrodes.forEach((el) => {
+          el.update_scale( v );
+        });
+
+        this._update_canvas();
+
+      });
+
+    const elec_text_size = this.gui.add_item( 'Text Scale', 1.0, { folder_name: folder_name })
+      .min(1).max(3).step(0.1)
+      .onChange((v) => {
+
+        electrodes.forEach((el) => {
+          el.update_scale( undefined, v );
+        });
+
+        this._update_canvas();
+
+      });
+
     // remove electrode
     this.gui.add_item( 'Enable/Disable Electrode', () => {
       if( refine_electrode &&
-          refine_electrode.isThreeBrainObject &&
-          (0,sphere/* is_electrode */.OK)( refine_electrode.object ) ){
-        if( refine_electrode._enabled ){
-          refine_electrode._enabled = false;
-          refine_electrode.object.material.color.set( COL_DISABLED );
+          refine_electrode.isLocElectrode ){
+        if( refine_electrode.enabled() ){
+          refine_electrode.disable();
           refine_electrode = null;
         } else {
-          refine_electrode.object._enabled = true;
-          refine_electrode.object.material.color.set( COL_ENABLED );
+          refine_electrode.enable();
           refine_electrode = null;
         }
 
@@ -57737,16 +59337,28 @@ function register_controls_localization( THREEBRAIN_PRESETS ){
           this.fire_change({ "localization_table" : JSON.stringify( this.canvas.electrodes_info() ) });
         }
 
-
         this._update_canvas();
       }
     },  { folder_name: folder_name });
 
     this.gui.add_item( 'Auto-Adjust Highlighted', () => {
       if( refine_electrode &&
-          refine_electrode.isThreeBrainObject &&
-          (0,sphere/* is_electrode */.OK)( refine_electrode.object ) ){
-        adjust_local( [ refine_electrode ] );
+          refine_electrode.isLocElectrode ){
+        refine_electrode.adjust();
+
+        if(this.shiny){
+          this.fire_change({ "localization_table" : JSON.stringify( this.canvas.electrodes_info() ) });
+        }
+
+        this._update_canvas();
+      }
+    },  { folder_name: folder_name });
+
+    this.gui.add_item( 'Reset Highlighted', () => {
+      if( refine_electrode &&
+          refine_electrode.isLocElectrode ){
+
+        refine_electrode.reset_position();
 
         if(this.shiny){
           this.fire_change({ "localization_table" : JSON.stringify( this.canvas.electrodes_info() ) });
@@ -57757,7 +59369,9 @@ function register_controls_localization( THREEBRAIN_PRESETS ){
     },  { folder_name: folder_name });
 
     this.gui.add_item( 'Auto-Adjust All', () => {
-      adjust_local( electrodes );
+      electrodes.forEach((el) => {
+        el.adjust();
+      });
 
       if(this.shiny){
         this.fire_change({ "localization_table" : JSON.stringify( this.canvas.electrodes_info() ) });
@@ -57809,19 +59423,25 @@ function register_controls_localization( THREEBRAIN_PRESETS ){
         } else {
           res = electrode_line_from_slice( this.canvas, electrodes, v + 2 );
         }
+        // return({
+        //   positions : re,
+        //   direction : step
+        // });
 
-        if( res.length ){
+        if( res.positions.length ){
           const last_elec = electrodes.pop();
-          res.push(new threeplugins/* THREE.Vector3 */.J.Vector3().fromArray(
-            last_elec._params.position
+          res.direction.normalize();
+          res.positions.push(new threeplugins/* THREE.Vector3 */.J.Vector3().fromArray(
+            last_elec.instance._params.position
           ));
-          last_elec.object.userData.dispose();
+          last_elec.dispose();
 
-          res.forEach((pos) => {
-            const el = add_electrode(
-              scode, electrodes.length + 1, pos, this.canvas
-            );
-            el._mode = mode;
+          res.positions.forEach((pos) => {
+            const el = new LocElectrode(
+              scode, electrodes.length + 1, pos, this.canvas,
+              elec_size.getValue(), elec_text_size.getValue());
+            el.set_mode( mode );
+            el.__interpolate_direction = res.direction.clone().normalize();
             electrodes.push( el );
           });
 
@@ -57844,88 +59464,6 @@ function register_controls_localization( THREEBRAIN_PRESETS ){
       folder_name: folder_name
     });
 
-
-
-    const adjust_local = (el_list) => {
-      // el is a threebrain instance
-      // inst is the CT
-      if( !el_list || !el_list.length ){ return; }
-      const els = el_list.filter((el) => { return( el && el._mode === "CT/volume" ); });
-      if( !els.length ){ return; }
-      const inst = this.current_voxel_type();
-      if( !inst ){ return; }
-
-      const margin_voxels = new threeplugins/* THREE.Vector3 */.J.Vector3().fromArray( inst._cube_dim );
-      const margin_lengths = new threeplugins/* THREE.Vector3 */.J.Vector3().set(
-        inst._margin_length.xLength,
-        inst._margin_length.yLength,
-        inst._margin_length.zLength
-      );
-      const f = new threeplugins/* THREE.Vector3 */.J.Vector3().set(
-        margin_lengths.x / margin_voxels.x,
-        margin_lengths.y / margin_voxels.y,
-        margin_lengths.z / margin_voxels.z
-      );
-      const mx = margin_voxels.x,
-            my = margin_voxels.y,
-            mz = margin_voxels.z;
-      const ct_data = inst._cube_values;
-
-      const delta = 4;
-      els.forEach((el) => {
-        const position = el.object.userData.construct_params.position;
-
-        let i = ( position[0] + ( margin_lengths.x - 1 ) / 2 ) / f.x;
-        let j = ( position[1] + ( margin_lengths.y - 1 ) / 2 ) / f.y;
-        let k = ( position[2] + ( margin_lengths.z - 1 ) / 2 ) / f.z;
-
-        i = Math.round( i );
-        j = Math.round( j );
-        k = Math.round( k );
-
-        if( i < 0 ){ i = 0; }
-        if( i >= mx ){ i = mx - 1; }
-        if( j < 0 ){ k = 0; }
-        if( j >= my ){ j = my - 1; }
-        if( k < 0 ){ k = 0; }
-        if( k >= mz ){ k = mz - 1; }
-
-        const new_ijk = [0, 0, 0];
-        let thred = ct_data[ i + j * mx + k * mx * my ];
-        let tmp, total_v = 0;
-        for(let i0 = Math.max(0, i - delta); i0 < Math.min(i + delta, mx); i0++ ) {
-          for(let j0 = Math.max(0, j - delta); j0 < Math.min(j + delta, my); j0++ ) {
-            for(let k0 = Math.max(0, k - delta); k0 < Math.min(k + delta, mz); k0++ ) {
-              tmp = ct_data[ i0 + j0 * mx + k0 * mx * my ];
-              if( tmp >= thred ) {
-                total_v += tmp;
-                new_ijk[0] += tmp * i0;
-                new_ijk[1] += tmp * j0;
-                new_ijk[2] += tmp * k0;
-              }
-            }
-          }
-        }
-        if( total_v <= 0 ){ return; }
-        new_ijk[0] /= total_v;
-        new_ijk[1] /= total_v;
-        new_ijk[2] /= total_v;
-
-        const x = (new_ijk[0] - 0.5) * f.x - ( margin_lengths.x - 1 ) / 2,
-              y = (new_ijk[1] - 0.5) * f.y - ( margin_lengths.y - 1 ) / 2,
-              z = (new_ijk[2] + 0.5) * f.z - ( margin_lengths.z - 1 ) / 2;
-
-        el.object.userData.construct_params.position[0] = x;
-        el.object.userData.construct_params.position[1] = y;
-        el.object.userData.construct_params.position[2] = z;
-
-        el.object.position.set( x, y, z );
-
-      });
-
-
-    }
-
     // will get tkrRAS
     const electrode_pos = () => {
       const mode = edit_mode.getValue();
@@ -57943,8 +59481,7 @@ function register_controls_localization( THREEBRAIN_PRESETS ){
         case "refine":
           if(
             refine_electrode &&
-            refine_electrode.isThreeBrainObject &&
-            (0,sphere/* is_electrode */.OK)( refine_electrode.object )
+            refine_electrode.isLocElectrode
           ){
             pos.copy( refine_electrode.object.position );
             pos_alt = pos;
@@ -58011,8 +59548,10 @@ function register_controls_localization( THREEBRAIN_PRESETS ){
 
           const num = electrodes.length + 1,
               group_name = `group_Electrodes (${scode})`;
-          const el = add_electrode(scode, num, electrode_position, this.canvas);
-          el._mode = mode;
+          const el = new LocElectrode(
+            scode, num, electrode_position, this.canvas,
+            elec_size.getValue(), elec_text_size.getValue());
+          el.set_mode( mode );
           electrodes.push( el );
           this.canvas.switch_subject();
         } else {
@@ -58023,17 +59562,13 @@ function register_controls_localization( THREEBRAIN_PRESETS ){
           if( el && (0,sphere/* is_electrode */.OK)( el ) ){
             if(
               refine_electrode &&
-              refine_electrode.isThreeBrainObject &&
+              refine_electrode.isLocElectrode &&
               (0,sphere/* is_electrode */.OK)( refine_electrode.object )
             ){
-              if( refine_electrode._enabled ){
-                refine_electrode.object.material.color.set( COL_ENABLED );
-              } else {
-                refine_electrode.object.material.color.set( COL_DISABLED );
-              }
+              refine_electrode.update_color();
             }
-            refine_electrode = el.userData.instance;
-            el.material.color.set( COL_SELECTED );
+            refine_electrode = el.userData.localization_instance;
+            refine_electrode.update_color( COL_SELECTED );
           }
         }
 
@@ -58058,6 +59593,7 @@ function register_controls_localization( THREEBRAIN_PRESETS ){
         refine_electrode.object.position[nm] -= step;
         refine_electrode.object.userData.construct_params.position[idx] -= step;
       }
+      refine_electrode.update_line();
       if(this.shiny){
         this.fire_change({ "localization_table" : JSON.stringify( this.canvas.electrodes_info() ) });
       }
@@ -58080,7 +59616,7 @@ function register_controls_localization( THREEBRAIN_PRESETS ){
     this.gui.hide_item([
       ' - tkrRAS', ' - MNI305', ' - T1 RAS', 'Interpolate Size',
       'Interpolate from Recently Added',
-      'Auto-Adjust Highlighted', 'Auto-Adjust All'
+      'Auto-Adjust Highlighted', 'Auto-Adjust All', 'Reset Highlighted'
     ], folder_name);
   };
 
@@ -62123,9 +63659,8 @@ class THREE_BRAIN_SHINY {
        args.Coord_x, args.Coord_y, args.Coord_z,
        args.mode || "CT/volume", false
     );
-    window.eeee = el;
     if( el ){
-      const locorder = el._localization_params.localizationOrder;
+      const locorder = el.localization_order;
       this.presets.localization_set_electrode(
         locorder, args, args.update_shiny
       );
@@ -63550,6 +65085,7 @@ class DataCube2 extends geometry_abstract/* AbstractThreeBrainObject */.j {
 
       uniforms.alpha.value = -1.0;
       uniforms.scale_inv.value.set(1 / volume.xLength, 1 / volume.yLength, 1 / volume.zLength);
+      uniforms.screenPos.value.set( 0.0, 0.0, 1.0 );
 
       this._bounding_min = bounding_min;
       this._bounding_max = bounding_max;
@@ -63609,7 +65145,15 @@ class DataCube2 extends geometry_abstract/* AbstractThreeBrainObject */.j {
   get_track_data( track_name, reset_material ){}
 
   pre_render( results ){
-    this._mesh.material.uniforms.cameraPos.value.copy( this._canvas.main_camera.position );
+    const orig = this._canvas.origin;
+    if( typeof( orig.setFromMatrixPosition ) === "function" ){
+      orig
+        .getWorldPosition(
+          this._mesh.material.uniforms.screenPos
+        )
+        .applyMatrix4(this._canvas.main_camera.matrixWorldInverse)
+        .applyMatrix4(this._canvas.main_camera.projectionMatrix);
+    }
 
     // if surface is using it
     if( this._canvas.__hide_voxels ){
@@ -64496,7 +66040,7 @@ class FreeMesh extends geometry_abstract/* AbstractThreeBrainObject */.j {
         }
       }
     } else if( this._material_options.which_map.value === constants/* CONSTANTS.ELECTRODE_COLOR */.t.ELECTRODE_COLOR){
-      this._link_electrodes()
+      this._link_electrodes();
     }
   }
 
@@ -65452,7 +66996,7 @@ class THREEBRAIN_CANVAS {
     this.loader_manager.onError = function ( url ) { console.debug( 'There was an error loading ' + url ) };
 
     this.json_loader = new threeplugins/* THREE.FileLoader */.J.FileLoader( this.loader_manager );
-    this.font_loader = new threeplugins/* THREE.FontLoader */.J.FontLoader( this.loader_manager );
+    // this.font_loader = new THREE.FontLoader( this.loader_manager );
 
   }
 
@@ -67706,7 +69250,7 @@ class THREEBRAIN_CANVAS {
       gp.userData.inv_trans_mat = inverse_trans;
 
       if(!g.disable_trans_mat){
-        gp.applyMatrix(trans);
+        gp.applyMatrix4(trans);
       }
     }
 
@@ -68491,13 +70035,13 @@ mapped = false,
           g = e.userData.construct_params;
 
           inst = e.userData.instance;
-          const loc_params = inst._localization_params || {};
+          const loc_inst = e.userData.localization_instance || {};
 
           if( inst._enabled === false ){
             continue;
           }
-          if( typeof( inst._fs_label ) === "function" ){
-            fs_label = inst._fs_label( loc_params.FSIndex );
+          if( typeof( loc_inst.get_fs_label ) === "function" ){
+            fs_label = loc_inst.get_fs_label();
           } else {
             fs_label = [ "Unknown", 0 ];
           }
@@ -68505,12 +70049,12 @@ mapped = false,
           pos.fromArray( g.position );
 
           // Electrode Coord_x Coord_y Coord_z Label Hemisphere
-          row.Electrode = loc_params.Electrode || "";
+          row.Electrode = loc_inst.Electrode || "";
           row.Coord_x = pos.x;
           row.Coord_y = pos.y;
           row.Coord_z = pos.z;
-          if( loc_params.Label ){
-            row.Label = loc_params.Label;
+          if( loc_inst.Label ){
+            row.Label = loc_inst.Label;
           } else {
             row.Label = parsed[2] || "NoLabel";
             if( row.Label && row.Label !== "" ){
@@ -68518,7 +70062,7 @@ mapped = false,
               row.Label = `${row.Label}${label_list[[row.Label]]}`;
             }
           }
-          row.LocalizationOrder = loc_params.localizationOrder || parseInt( parsed[1] );
+          row.LocalizationOrder = loc_inst.localization_order || parseInt( parsed[1] );
           row.FSIndex = fs_label[1];
           row.FSLabel = fs_label[0];
 
@@ -69878,20 +71422,22 @@ const register_volumeShader1 = function(THREE){
       cmap: { value: null },
       nmap: { value: null },
       mask: { value: null },
-      cameraPos: { value: new THREE.Vector3() },
       alpha : { value: -1.0 },
       steps: { value: 300 },
       scale_inv: { value: new THREE.Vector3() },
+      screenPos: { value: new THREE.Vector3() },
       bounding: { value : 0.5 }
     },
     vertexShader: remove_comments(`#version 300 es
 precision highp float;
 in vec3 position;
-// uniform mat4 modelMatrix;
+uniform mat4 modelMatrix;
+uniform mat4 viewMatrix;
 uniform mat4 modelViewMatrix;
 uniform mat4 projectionMatrix;
-uniform vec3 cameraPos;
+uniform vec3 cameraPosition;
 uniform vec3 scale_inv;
+uniform vec3 screenPos;
 
 out mat4 pmv;
 out vec3 vOrigin;
@@ -69900,8 +71446,9 @@ void main() {
   pmv = projectionMatrix * modelViewMatrix;
 
   // For perspective camera, vorigin is camera
-  // 'vOrigin = vec3( inverse( modelMatrix ) * vec4( cameraPos, 1.0 ) ).xyz / scale;',
-  // 'vDirection = position / scale - vOrigin;',
+  // vec4 vorig = inverse( modelMatrix ) * vec4( cameraPosition, 1.0 );
+  // vOrigin = - vorig.xyz * scale_inv;
+  // vDirection = position * scale_inv - vOrigin;
 
   // Orthopgraphic camera, camera position in theory is at infinite
   // instead of using camera's position, we can directly inverse (projectionMatrix * modelViewMatrix)
@@ -69909,11 +71456,17 @@ void main() {
   // obtains Orthopgraphic direction, which can be directly used as ray direction
 
   // 'vDirection = vec3( inverse( pmv ) * vec4( 0.0,0.0,0.0,1.0 ) ) / scale;',
-  vDirection = inverse( pmv )[3].xyz * scale_inv;
+  // vDirection = inverse( pmv )[3].xyz * scale_inv;
+  vec4 vdir = inverse( pmv ) * vec4( screenPos.x / screenPos.z, screenPos.y / screenPos.z, 1.0, 1.0 );
+  vDirection = vdir.xyz * scale_inv  / vdir.w;
 
   // Previous test code, seems to be poor because camera position is not well-calculated?
   // 'vDirection = - normalize( vec3( inverse( modelMatrix ) * vec4( cameraPos , 1.0 ) ).xyz ) * 1000.0;',
-  vOrigin = (position - vec3(0.6,-0.6,0.6)) * scale_inv - vDirection;
+  // vOrigin = (position - vec3(0.6,-0.6,0.6)) * scale_inv - vDirection;
+  vOrigin = (position) * scale_inv - vDirection;
+
+  // sample need to shift by 0.5 voxel
+  // gl_Position = pmv * vec4( position + 0.5, 1.0 );
   gl_Position = pmv * vec4( position, 1.0 );
 }`),
     fragmentShader: remove_comments(`#version 300 es
@@ -70283,7 +71836,122 @@ function add_text_sprite(THREE){
 
   }
 
+  class Sprite2 extends THREE.Sprite {
+    constructor( material ) {
+      super( material );
+
+      if( material.map.isTextTexture ){
+        material.map.object = this;
+        // re-draw texture
+        material.map.draw_text( material.map.text );
+      }
+
+    }
+  }
+
+  class TextTexture extends THREE.Texture {
+
+    constructor( text, mapping, wrapS, wrapT, magFilter, minFilter, format,
+      type, anisotropy, font = "Courier", size = 32
+    ) {
+
+      const canvas = document.createElement("canvas");
+      super( canvas, mapping, wrapS, wrapT, magFilter, minFilter, format, type, anisotropy );
+
+      // this._text = text || " ";
+      this._size = Math.ceil( size );
+      this._canvas = canvas;
+      // this._canvas.height = this._size;
+      // this._canvas.width = Math.ceil( this._text.length * this._size * 0.6 );
+      this._context = this._canvas.getContext("2d");
+      // this._context.font = `${this._size}px ${font}`;
+      // this._context.fillText( this._text, 0, this._size * 26 / 32);
+      this._font = font;
+  		// this.needsUpdate = true;
+  		this.isTextTexture = true;
+  		this.object = null;
+
+  		this.draw_text( text );
+
+  	}
+
+  	update_scale( v ) {
+  	  if( this.object && typeof this.object === "object" &&
+          this.object.isSprite === true )
+      {
+        if( v ){
+          this.object.scale.z = v;
+        }
+        const base_scale = this.object.scale.z;
+        this.object.scale.x = this._text.length * 0.6 * this.object.scale.z;
+        this.object.scale.y = 1 * this.object.scale.z;
+      }
+  	}
+
+    // align (0: center, 1: left, 2: right, 3: based on "-" or center)
+  	draw_text( text, more_args = {} ){
+
+      this.text = text || "";
+
+      // color = "#000000", shadow_color = "#FFFFF", shadow_blur = 4
+      this._align = more_args.align || "smart";
+      this._color = more_args.color || this._color || "#000000";
+      this._shadow_color = more_args.shadow_color || this._shadow_color || "#FFFFFF";
+      this._shadow_blur = more_args.shadow_blur ||
+                                typeof this._shadow_blur === "undefined" ? 4 : this._shadow_blur;
+
+      if( this.object && typeof this.object === "object" &&
+          this.object.isSprite === true )
+      {
+    	  switch ( this._align ) {
+    	    case 'left':
+    	      this.object.center.x = 0.5 / this.text.length;
+    	      break;
+    	    case 'center':
+    	      this.object.center.x = 0.5;
+    	      break;
+    	    case 'right':
+    	      this.object.center.x = 1.0 - 0.5 / this.text.length;
+    	      break;
+    	    case 'smart':
+    	      // find the first '-'
+    	      const dash = this.text.indexOf("-");
+    	      if( dash >= 0 ){
+    	        this.object.center.x = dash * 0.5 / this.text.length;
+    	      } else {
+    	        this.object.center.x = 0.5;
+    	      }
+    	      break;
+    	    default:
+    	      // do nothing
+    	  }
+      }
+  	  this._text = this.text;
+
+      this._canvas.width = Math.ceil( this._text.length * this._size * 0.6 );
+      this._canvas.height = this._size;
+      this._context.clearRect( 0 , 0 , this._canvas.width , this._canvas.height );
+      this._context.font = `${this._size}px ${this._font}`;
+      this._context.fillStyle = this._color;
+      this._context.shadowBlur = this._shadow_blur || 0;
+      this._context.shadowColor = this._shadow_color;
+      this._context.fillText(this._text, 0, this._size * 26 / 32);
+      this.needsUpdate = true;
+
+      this.update_scale();
+
+  	}
+
+  }
+
+
+
+
+
+
   THREE.TextSprite = TextSprite;
+  THREE.TextTexture = TextTexture;
+  THREE.Sprite2 = Sprite2;
 
   return(THREE);
 
@@ -72303,7 +73971,7 @@ var __webpack_exports__ = {};
 /* harmony import */ var _js_WebGL_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(5278);
 /* harmony import */ var _js_threeplugins_js__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(1829);
 /* harmony import */ var _js_core_gui_wrapper_js__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(2814);
-/* harmony import */ var _js_core_data_controls_js__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(6303);
+/* harmony import */ var _js_core_data_controls_js__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(6683);
 /* harmony import */ var _js_shiny_tools_js__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(8173);
 /* harmony import */ var _js_threejs_scene_js__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(5043);
 /* harmony import */ var _js_threebrain_cache_js__WEBPACK_IMPORTED_MODULE_10__ = __webpack_require__(5664);
