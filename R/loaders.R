@@ -18,15 +18,27 @@
 NULL
 
 #' @rdname template_subject
-#' @param subject_code character with only letters and numbers (Important). Default is `N27`
-#' @param url zip file address
+#' @param subject_code character with only letters and numbers (Important); default is `N27`
+#' @param url zip file address; must be specified if \code{subject_code} is not from the followings: \code{'bert'}, \code{'cvs_avg35'}, \code{'cvs_avg35_inMNI152'}, \code{'fsaverage'}, \code{'fsaverage_sym'}, or \code{'N27'}
 #' @param template_dir parent directory where subject's `FreeSurfer` folder should be stored
 #' @export
 download_template_subject <- function(
-  subject_code = 'N27',
-  url = 'https://github.com/dipterix/threeBrain-sample/releases/download/1.0.0/N27.zip',
+  subject_code = 'N27', url,
   template_dir = default_template_directory()
 ){
+
+  force(subject_code)
+  if(missing(url) || is.null(url)) {
+    avails <- available_templates()
+    if(!subject_code %in% names(avails)) {
+      stop("`download_template_subject`: please specify the url for your template if subject code is not from the followings: ", paste(names(avails), collapse = ", "))
+    }
+    url <- avails[[subject_code]]
+  }
+
+  # = 'https://github.com/dipterix/threeBrain-sample/releases/download/1.0.0/N27.zip'
+
+
   dir_create(template_dir)
   dir <- normalizePath(template_dir)
 
@@ -131,15 +143,22 @@ threebrain_finalize_installation <- function(upgrade = c('ask', 'always', 'never
   })
 
   if(has_n27 && upgrade %in% c('never')){
-    dipsaus::cat2('N27 brain has been installed', level = 'DEFAULT')
+    cat2('N27 brain has been installed', level = 'DEFAULT')
     return(invisible())
   }
 
   if(has_n27 && upgrade %in% c('ask')){
     if(interactive()){
       reinst <- tryCatch({
-        dipsaus::ask_yesno('N27 template brain detected at \n  ', template_dir,
-                           '\nDo you want to reinstall?', error_if_canceled = FALSE)
+        if(package_installed("dipsaus")) {
+          dipsaus::ask_yesno('N27 template brain detected at \n  ', template_dir,
+                             '\nDo you want to reinstall?', error_if_canceled = FALSE)
+        } else {
+          utils::askYesNo(msg = paste0(
+            'N27 template brain detected at `', template_dir,
+            '`. Do you want to reinstall? '
+          ), default = FALSE)
+        }
       }, error = function(e){
         FALSE
       })
@@ -148,34 +167,80 @@ threebrain_finalize_installation <- function(upgrade = c('ask', 'always', 'never
     }
 
     if(!isTRUE(reinst)){
-      dipsaus::cat2('N27 template brain... skip', level = 'DEFAULT')
+      cat2('N27 template brain... skip', level = 'DEFAULT')
       return(invisible())
     }
   }
 
   # install N27 brain
 
-  if( async ){
+  if( async && package_installed("dipsaus") ){
     code <- sprintf(
       "{
-  dipsaus::cat2('Installing N27 template brain...', level = 'INFO')
+  threeBrain:::cat2('Installing N27 template brain...', level = 'INFO')
   threeBrain::download_N27(template_dir = '%s')
 
   # load N27
-  dipsaus::cat2('Expand the template, creating cache...', level = 'INFO')
+  threeBrain:::cat2('Expand the template, creating cache...', level = 'INFO')
   threeBrain::merge_brain(template_subject = 'N27')
   }", template_dir)
 
     dipsaus::rs_exec(parse(text = code)[[1]], name = 'Finalize threeBrain N27 installation', quoted = TRUE)
   } else {
-    dipsaus::cat2('Installing N27 template brain...', level = 'INFO')
-    threeBrain::download_N27(template_dir = template_dir)
+    cat2('Installing N27 template brain...', level = 'INFO')
+    download_N27(template_dir = template_dir)
     # load N27
-    dipsaus::cat2('Expand the template, creating cache...', level = 'INFO')
-    threeBrain::merge_brain(template_subject = 'N27', template_dir = template_dir)
+    cat2('Expand the template, creating cache...', level = 'INFO')
+    merge_brain(template_subject = 'N27', template_dir = template_dir)
   }
 
 
   return(invisible())
 }
+
+
+#' @rdname template_subject
+#' @export
+available_templates <- function() {
+
+  url <- "https://api.github.com/repos/dipterix/threeBrain-sample/releases"
+  tf <- tempfile()
+  on.exit({
+    if(file.exists(tf)) {
+      unlink(tf)
+    }
+  })
+
+  res <- tryCatch({
+    utils::download.file(url, destfile = tf, quiet = TRUE)
+    res <- jsonlite::read_json(tf)[[1]]
+    res <- lapply(res$assets, function(asset){
+      list(
+        subject_name = gsub("\\..*", "", asset$name),
+        download_url = asset$browser_download_url
+      )
+    })
+
+    scodes <- vapply(res, FUN = '[[', FUN.VALUE = "", 'subject_name')
+    urls <- lapply(res, FUN = '[[', 'download_url')
+
+    names(urls) <- scodes
+    urls
+
+  }, error = function(e){
+    # As of 2022-05-09
+    list(
+      bert = "https://github.com/dipterix/threeBrain-sample/releases/download/1.0.0/bert.zip",
+      cvs_avg35 = "https://github.com/dipterix/threeBrain-sample/releases/download/1.0.0/cvs_avg35.zip",
+      cvs_avg35_inMNI152 = "https://github.com/dipterix/threeBrain-sample/releases/download/1.0.0/cvs_avg35_inMNI152.zip",
+      fsaverage = "https://github.com/dipterix/threeBrain-sample/releases/download/1.0.0/fsaverage.zip",
+      fsaverage_sym = "https://github.com/dipterix/threeBrain-sample/releases/download/1.0.0/fsaverage_sym.zip",
+      `N27-complete` = "https://github.com/dipterix/threeBrain-sample/releases/download/1.0.0/N27-complete.zip",
+      N27 = "https://github.com/dipterix/threeBrain-sample/releases/download/1.0.0/N27.zip"
+    )
+  })
+
+  return(res)
+}
+
 

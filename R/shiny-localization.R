@@ -38,7 +38,7 @@ localization_module <- function(
   ..., control_presets = NULL, side_display = FALSE, controllers = list()
 ){
 
-  if(!dipsaus::package_installed("DT")){
+  if(!package_installed("DT")){
     stop("Package `DT` is needed to run this module. Please install it by running\n  ",
          "install.packages('DT')")
   }
@@ -99,6 +99,7 @@ localization_module <- function(
         controllers[["Left Opacity"]] <- 0.4
         controllers[["Right Opacity"]] <- 0.4
         controllers[["Voxel Type"]] <- "CT"
+        controllers[["Voxel Display"]] <- "normal"
         controllers[["Voxel Min"]] <- 3000
         controllers[["Edit Mode"]] <- "CT/volume"
         controllers[["Highlight Box"]] <- FALSE
