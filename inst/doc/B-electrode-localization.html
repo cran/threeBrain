@@ -120,13 +120,20 @@ code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warni
   for (var i = 0; i < sheets.length; i++) {
     if (sheets[i].ownerNode.dataset["origin"] !== "pandoc") continue;
     try { var rules = sheets[i].cssRules; } catch (e) { continue; }
-    for (var j = 0; j < rules.length; j++) {
+    var j = 0;
+    while (j < rules.length) {
       var rule = rules[j];
       // check if there is a div.sourceCode rule
-      if (rule.type !== rule.STYLE_RULE || rule.selectorText !== "div.sourceCode") continue;
+      if (rule.type !== rule.STYLE_RULE || rule.selectorText !== "div.sourceCode") {
+        j++;
+        continue;
+      }
       var style = rule.style.cssText;
       // check if color or background-color is set
-      if (rule.style.color === '' && rule.style.backgroundColor === '') continue;
+      if (rule.style.color === '' && rule.style.backgroundColor === '') {
+        j++;
+        continue;
+      }
       // replace div.sourceCode by a pre.sourceCode rule
       sheets[i].deleteRule(j);
       sheets[i].insertRule('pre.sourceCode{' + style + '}', j);
@@ -335,15 +342,17 @@ code > span.er { color: #a61717; background-color: #e3d2d2; }
 
 <div id="TOC">
 <ul>
-<li><a href="#ct-co-registration">CT Co-registration</a></li>
-<li><a href="#localize-with-ct">Localize with CT</a></li>
-<li><a href="#localize-with-mri-without-ct">Localize with MRI (without
+<li><a href="#ct-co-registration" id="toc-ct-co-registration">CT
+Co-registration</a></li>
+<li><a href="#localize-with-ct" id="toc-localize-with-ct">Localize with
+CT</a></li>
+<li><a href="#localize-with-mri-without-ct" id="toc-localize-with-mri-without-ct">Localize with MRI (without
 CT)</a></li>
-<li><a href="#automatically-interpolate-electrodes">Automatically
-interpolate electrodes</a></li>
-<li><a href="#refine-electrodes">Refine electrodes</a></li>
-<li><a href="#download-electrode-table">Download Electrode
-Table</a></li>
+<li><a href="#automatically-interpolate-electrodes" id="toc-automatically-interpolate-electrodes">Automatically interpolate
+electrodes</a></li>
+<li><a href="#refine-electrodes" id="toc-refine-electrodes">Refine
+electrodes</a></li>
+<li><a href="#download-electrode-table" id="toc-download-electrode-table">Download Electrode Table</a></li>
 </ul>
 </div>
 

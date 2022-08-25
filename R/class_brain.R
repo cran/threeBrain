@@ -25,6 +25,7 @@ Brain2 <- R6::R6Class(
     #Stores a list of BrainElectrodes objects
     electrodes = NULL,
 
+    globals = NULL,
     misc = NULL,
 
     ## Transforms
@@ -45,6 +46,7 @@ Brain2 <- R6::R6Class(
                   msg = 'Torig must be 4x4 matrix')
 
       private$.subject_code <- subject_code
+      self$misc <- list()
 
       self$xfm <- xfm
       self$Norig <- Norig
@@ -56,7 +58,7 @@ Brain2 <- R6::R6Class(
       self$meta <- list()
 
       # TODO: put all brain global data (transform etc...) here
-      self$misc <- BlankGeom$new(
+      self$globals <- BlankGeom$new(
         group = GeomGroup$new(name = sprintf('_internal_group_data_%s', subject_code)),
         name = sprintf('_misc_%s', subject_code)
       )
@@ -141,7 +143,7 @@ Brain2 <- R6::R6Class(
     # special: must be cached path
     add_vertex_color = function(name, path, lazy = TRUE){
       path <- normalizePath(path)
-      self$misc$group$set_group_data(
+      self$globals$group$set_group_data(
         name = name,
         value = list(
           path = path,
@@ -288,7 +290,7 @@ Brain2 <- R6::R6Class(
 
     get_geometries = function(volumes = TRUE, surfaces = TRUE, electrodes = TRUE, atlases = TRUE){
 
-      geoms <- list(self$misc)
+      geoms <- list(self$globals)
 
       if( is.logical(volumes) ){
         if(isTRUE(volumes)){ volumes <- self$volume_types }else{ volumes <- NULL }
@@ -321,6 +323,8 @@ Brain2 <- R6::R6Class(
         geoms <- c(geoms, self$electrodes$objects)
       }
 
+      geoms <- c(geoms, self$misc)
+
       return( unlist( geoms ) )
 
     },
@@ -331,12 +335,12 @@ Brain2 <- R6::R6Class(
 
       cat('Transforms:\n\n- FreeSurfer TalXFM [from scanner to MNI305]:\n')
       base::print( self$xfm )
-      cat('\n- Torig [Voxel CRS to FreeSurfer origin, vox2ras-tkr]\n')
+      cat('\n- Torig [Voxel IJK/CRS to FreeSurfer space tkrRAS, vox2ras-tkr]\n')
       base::print( self$Torig )
-      cat('\n- Norig [Voxel CRS to Scanner center, vox2ras]\n')
+      cat('\n- Norig [Voxel IJK/CRS to Scanner space, vox2ras]\n')
       base::print( self$Norig )
 
-      cat('\n- Scanner center relative to FreeSurfer origin\n')
+      cat('\n- Scanner origin in FreeSurfer tkrRAS coordinate\n')
       base::print( self$scanner_center )
       cat('\n- FreeSurfer RAS to MNI305, vox2vox-MNI305\n')
       base::print( self$vox2vox_MNI305 )
@@ -382,17 +386,24 @@ Brain2 <- R6::R6Class(
       controllers[["Highlight Box"]] <- FALSE
 
       if(!missing( coregistered_ct )){
-        ct <- read_nii2( normalizePath(coregistered_ct, mustWork = TRUE) )
+
+        if(!inherits(coregistered_ct, "threeBrain.nii")) {
+          ct <- read_nii2( normalizePath(coregistered_ct, mustWork = TRUE) )
+        } else {
+          ct <- coregistered_ct
+        }
+
         # cube <- reorient_volume( ct$get_data(), self$Torig )
 
         # TODO: FIXME
 
         # add_voxel_cube(self, "CT", cube)
-        ct_shift <- ct$get_center_matrix()
-        ct_qform <- ct$get_qform()
-        matrix_world <- brain$Torig %*% solve(brain$Norig) %*% ct_qform %*% ct_shift
-        # matrix_world <- NULL
-        add_voxel_cube(self, "CT", ct$get_data(), size = ct$get_size(),
+        ct_shape <- ct$get_shape()
+        matrix_world <- diag(rep(1, 4))
+        matrix_world[1:3, 4] <- ct_shape / 2
+        matrix_world <- ct$get_IJK_to_tkrRAS(self) %*% matrix_world
+
+        add_voxel_cube(self, "CT", ct$get_data(), size = ct_shape,
                        matrix_world = matrix_world)
 
         key <- seq(0, max(ct$get_range()))
@@ -406,17 +417,17 @@ Brain2 <- R6::R6Class(
         controllers[["Voxel Type"]] <- "CT"
         controllers[["Voxel Display"]] <- "normal"
         controllers[["Voxel Min"]] <- 3000
-        controllers[["Edit Mode"]] <- "CT/volume"
+        controllers[["Edit Mode"]] %?<-% "CT/volume"
         self$plot(
           control_presets = control_presets,
           voxel_colormap = cmap,
           controllers = controllers,
-          custom_javascript = "canvas.controls.noPan=true;",
+          # custom_javascript = "canvas.controls.noPan=true;",
           ...
         )
       } else {
         # No CT scan, use 3 planes to localize
-        controllers[["Edit Mode"]] <- "MRI slice"
+        controllers[["Edit Mode"]] %?<-% "MRI slice"
         controllers[["Overlay Coronal"]] <- TRUE
         controllers[["Overlay Axial"]] <- TRUE
         controllers[["Overlay Sagittal"]] <- TRUE
@@ -425,7 +436,7 @@ Brain2 <- R6::R6Class(
         self$plot(
           control_presets = control_presets,
           controllers = controllers,
-          custom_javascript = "canvas.controls.noPan=true;",
+          # custom_javascript = "canvas.controls.noPan=true;",
           ...
         )
       }

@@ -1,3 +1,19 @@
+threeBrain 0.2.6
+=======
+
+## Changes
+
+* Allowed users to pan the camera when localizing electrodes
+* Added line segment geometry type that can either display static line segments (such as `DTI`), or connect two electrodes dynamically
+* Printing brain now uses more accurate terms 
+* Allowed `CT` to be either path or the actual data when calling localizing function
+
+## Bug fixes
+
+* Fixed `NifTi` orientation issues and use `sform`
+* Fixed localization issue when `NifTi` transform matrix has determinant not equally to 1
+* Fixed volume shader, resolved shift issues when panning the camera
+
 threeBrain 0.2.5
 =======
 

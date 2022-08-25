@@ -161,3 +161,20 @@ rs_avail <- function(){
     return(FALSE)
   })
 }
+
+`%?<-%` <- function(lhs, value){
+  env <- parent.frame()
+  lhs <- substitute(lhs)
+
+  isnull <- tryCatch({
+    is.null(eval(lhs, envir = env))
+  }, error = function(e){
+    return(TRUE)
+  })
+
+
+  if(isnull){
+    eval(as.call(list( quote(`<-`), lhs, value )), envir = env)
+  }
+}
+
