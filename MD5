@@ -1,8 +1,8 @@
-366082863c0f74f3274af9bd04f23090 *DESCRIPTION
+b53c6ddec0d34ec4074fdee36df67303 *DESCRIPTION
 395ad2617f55e5f27201c366b1c94441 *LICENSE
 f7112ef28ab050e2fd7b0da530c42ba5 *NAMESPACE
-57845ecb74b8971ccdcad9e94dbe3ba4 *NEWS.md
-bae5c9d1a8af8071777f62f8ee52a74d *R/aaa.R
+cd59957626d2098c7c8094b1792db688 *NEWS.md
+f6ed71a2d3a59336b735da2acef77bd9 *R/aaa.R
 cb99ebf2794e6cb4e371d59b9ab142c1 *R/cache_afni_suma.R
 7df276cdd49158e28c983effde4ca785 *R/cache_fs.R
 757bceca797b9cebaac9ef099bf310c9 *R/cache_subject.R
@@ -13,7 +13,7 @@ a7c8563f569090978909fb13729227b5 *R/class_brainelectrodes.R
 a21e7f939a116623b0d516f887c3b134 *R/class_brainsurface.R
 88553ac352f80ec2177d30bad3216f5e *R/class_brainvolume.R
 a1821b4ead37ebabc64d2415e7b2da69 *R/class_multibrain.R
-7904c84ecbffd57347e1c4b87032996b *R/class_proxy.R
+a457afc0f205288103310af688d4ebf6 *R/class_proxy.R
 0b74f4f7ebfc7f38a511fc29ba433782 *R/ext_media.R
 70259e6f84b170fac12b17e05c60b6b0 *R/fs_brain.R
 4d16a5f22d72f7707d11ff39efb94746 *R/fs_brain2.R
@@ -36,7 +36,7 @@ fb5536be7df26a7e28b5efc052f423c8 *R/geom_linked.R
 4025e999c57e5147dfb3536a3d6103a0 *R/geom_plane.R
 63d8fc2ef45ea0bbb0243600d353ebca *R/geom_sphere.R
 19470505f2c69bf331dbc569a77d4a2e *R/geom_tube.R
-1783c0e56673380c8064225640945604 *R/loaders.R
+34d3781accd4b0e64213420e48ff08a0 *R/loaders.R
 7b9f802aa745948495133e04fa0da0aa *R/s3_geom.R
 bf76a537dbff5fbdd916ab38c8b73b22 *R/shiny-localization.R
 95a21f1477e7eefe3c0e0bba94c89997 *R/suma_import-atlas.R
@@ -44,7 +44,7 @@ bf76a537dbff5fbdd916ab38c8b73b22 *R/shiny-localization.R
 6f03d20bc9c1e6348d143a411bed814f *R/suma_import-surface.R
 8518f4d4491e7f77c3cb9c6dec91f0cd *R/suma_import-t1.R
 b687a46e4f8b51efee9be153d9795a43 *R/suma_import-xform.R
-9f3881c5673fe0e835a9f2f7051fde74 *R/threejs_brain.R
+a8e5a96e440aea23a96e0c7df2f764ee *R/threejs_brain.R
 29f6aa34f88fc40ab794a59a542144e9 *R/utils.R
 e4fbd8fbb9d6aec552c4472ee1436645 *R/utils_orient.R
 a5c4b452abf041a80d487720aa30e0a2 *R/utils_palette_voxel.R
@@ -54,9 +54,9 @@ a3afd988a3e818ebfd629d6ac3a74996 *R/viewer_ctint1.R
 afdf1a4afce5b9131c2985f3c3d5d551 *inst/CITATION
 8fbb20d14b96098d241f3acb4bfc84f7 *inst/WORDLIST
 60212c39d860d7cc7077ec0727dcd133 *inst/commands/README.txt
-c8c3579b7d6ba413afdce9fa0b3bb86f *inst/commands/launch.zip
+2496c276470cec3086b090f07e611364 *inst/commands/launch.zip
 4444e15715d8b598df57cd26f40a2937 *inst/commands/linux.sh
-4444e15715d8b598df57cd26f40a2937 *inst/commands/mac.command
+ba45021fb1ca0a43bda15ec9957a412d *inst/commands/mac.command
 afd844a0c618b22c1173ac9f06176bb1 *inst/commands/simple_server.py
 a4c0d94ac68cbd54f0e8399cf30c6f14 *inst/commands/windows.bat
 8bacf36b8d992d66edc9b94fc1cf20e3 *inst/doc/A-getting-started.R
@@ -71,7 +71,7 @@ eb44d57967a5d3a111fc8e42344c8965 *inst/doc/B-electrode-localization.Rmd
 b5eb27f1842b1b1271569ae08119c277 *inst/doi.svg
 7613e8881488064467b42ad6e4c6f0d2 *inst/htmlwidgets/lib/ccapture.js-1.0.9/CCapture.all.min.js
 65cdcd1a80cea36753cece6f161afd54 *inst/htmlwidgets/lib/dipterixThreeBrain-1.0.1/dipterix.css
-d449d12e95ce7d06d580c6d8520052ff *inst/htmlwidgets/lib/dipterixThreeBrain-1.0.1/main.js
+34f2fb362b106a3601f26c1c037503c5 *inst/htmlwidgets/lib/dipterixThreeBrain-1.0.1/main.js
 a5594d3950ebfdb8fa8697c516e5dde1 *inst/htmlwidgets/lib/dipterixThreeBrain-1.0.1/main.js.LICENSE.txt
 f537d2748e4bf2abd2a8d98aea0eefcb *inst/htmlwidgets/lib/dipterixThreeBrain-1.0.1/shortcuts.csv
 7ce04fba18ad1f554aaf4903c431f677 *inst/htmlwidgets/lib/threejs-0.101.1/css/dat.gui.css
