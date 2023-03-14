@@ -1,4 +1,8 @@
 #' Launch a 'shiny' application to localize electrodes
+#' @description
+#' If 'RAVE' has been installed, please use 'RAVE' modules. This function
+#' is purely for demonstration purposes.
+#'
 #' @param subject_code subject code
 #' @param fs_path the subject's 'FreeSurfer' path
 #' @param ct_path the file path of 'CT' scans that have already been aligned
@@ -22,12 +26,10 @@
 #'
 #' # using N27 to localize
 #' fs_path <- file.path(default_template_directory(), "N27")
-#' if(dir.exists(fs_path)){
+#' if(interactive() && dir.exists(fs_path)){
 #'   module <- localization_module("N27", fs_path)
 #'
-#'   if(interactive()){
-#'     print(module$app)
-#'   }
+#'   print(module$app)
 #' }
 #'
 #' @export
@@ -85,12 +87,12 @@ localization_module <- function(
         # TODO: FIXME
         # calculate matrixWorld
         ct_shape <- ct$get_shape()
-        matrix_world <- diag(rep(1, 4))
-        matrix_world[1:3, 4] <- ct_shape / 2
-        matrix_world <- ct$get_IJK_to_tkrRAS(brain) %*% matrix_world
+        trans_mat <- diag(rep(1, 4))
+        trans_mat[1:3, 4] <- ct_shape / 2
+        trans_mat <- ct$get_IJK_to_tkrRAS(brain) %*% trans_mat
 
         add_voxel_cube(brain, "CT", ct$get_data(), size = ct_shape,
-                       matrix_world = matrix_world)
+                       trans_mat = trans_mat)
         key <- seq(0, max(ct$get_range()))
         cmap <- create_colormap(
           gtype = 'volume', dtype = 'continuous',

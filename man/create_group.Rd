@@ -59,7 +59,7 @@ g$set_transform(matrix(c(
 ), byrow = TRUE, ncol = 4))
 
 # global position for s2 is 0,10,0
-threejs_brain(s1, s2)
+if( interactive() ) { threejs_brain(s1, s2) }
 
 # Example 2: cache
 
@@ -71,8 +71,8 @@ threejs_brain(s1, s2)
 
 template_dir <- default_template_directory()
 
-dat = threeBrain::read_fs_asc(
-  file.path(template_dir, 'N27/surf/lh.pial.asc')
+dat = freesurferformats::read.fs.surface(
+  file.path(template_dir, 'N27/surf/lh.pial')
 )
 vertex = dat$vertices[,1:3]
 face = dat$faces[,1:3]
