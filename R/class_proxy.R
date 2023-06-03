@@ -71,6 +71,13 @@ ViewerProxy <- R6::R6Class(
       private$set_value('background', col2hexStr(col))
     },
 
+    set_title = function( title ) {
+      if(missing(title) || length(title) == 0) {
+        title <- ""
+      }
+      private$set_value('title', paste(format(title), collapse = ""))
+    },
+
     set_zoom_level = function( zoom ){
       stopifnot2(zoom > 0, msg = 'zoom level must be strictly positive')
       private$set_value('zoom_level', zoom)
@@ -134,6 +141,10 @@ ViewerProxy <- R6::R6Class(
 
     clear_localization = function(update_shiny = TRUE){
       private$set_value( "clear_localization", isTRUE(update_shiny) )
+    },
+
+    set_incoming_localization_hemisphere = function( hemisphere ) {
+      private$set_value( "set_incoming_localization_hemisphere", paste(hemisphere, collapse = "") )
     },
 
     set_values = function( name, target_object, data_type,
