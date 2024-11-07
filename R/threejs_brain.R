@@ -28,14 +28,17 @@
 #' @param start_zoom numerical, positive number indicating camera zoom level
 #' @param symmetric numerical, default 0, color center will be mapped to this value
 #' @param tmp_dirname character path, internally used, where to store temporary files
-#' @param token unique character, internally used to identify widgets in JS localStorage
+#' @param token unique character, internally used to identify widgets in 'JavaScript' \code{'localStorage'}
 #' @param debug logical, internally used for debugging
 #' @param controllers list to override the settings, for example \code{proxy$get_controllers()}
-#' @param browser_external logical, use system default browser (default) or builtin one.
+#' @param browser_external logical, use system default browser (default) or built-in one.
 #' @param global_data,global_files internally use, mainly to store orientation matrices and files.
-#' @param show_modal logical or \code{"auto"}, whether to show a modal instead of direct rendering the viewers; designed for users who do not have 'WebGL' support; only used in shiny applications
+#' @param qrcode 'URL' to show in the 'QR' code; can be a character string or a named list of \code{'url'} and \code{'text'} (hyper-reference text)
+#' @param show_modal logical or \code{"auto"}, whether to show a modal instead of direct rendering the viewers; designed for users who do not have \code{'WebGL'} support; only used in shiny applications
 #' @param widget_id character, internally used as unique identifiers for widgets;
 #' only use it when you have multiple widgets in one website
+#' @param enable_cache whether to enable cache, useful when rendering the viewers repeatedly in shiny applications
+#' @param embed whether to try embedding the viewer in current run-time; default is false (will launch default web browser); set to true if running in \code{'rmarkdown'} or \code{'quarto'}, or to see the viewer in \code{'RStudio'} default panel.
 #' @param custom_javascript customized temporary 'JavaScript' code that runs after ready state; available 'JavaScript' variables are:
 #' \describe{
 #' \item{\code{'groups'}}{input information about each group}
@@ -103,12 +106,15 @@ threejs_brain <- function(
 
   # Builds, additional data, etc (misc)
   widget_id = 'threebrain_data', tmp_dirname = NULL,
-  debug = FALSE, token = NULL, controllers = list(),
+  debug = FALSE, enable_cache = FALSE, token = NULL, controllers = list(),
   browser_external = TRUE, global_data = list(), global_files = list(),
+
+  # QRCode
+  qrcode = NULL,
 
   # customized js code
   custom_javascript = NULL,
-  show_modal = "auto"
+  show_modal = "auto", embed = FALSE
 
 ){
   if(isTRUE(show_modal == 'auto')){
@@ -355,15 +361,18 @@ threejs_brain <- function(
     render_timestamp = isTRUE(timestamp),
     control_presets = control_presets,
     cache_folder = paste0(lib_path, widget_id, '-0/'),
+    worker_script = paste0(lib_path, "three-brain-1.0.0/threebrain-worker.js"),
     lib_path = lib_path,
     default_controllers = controllers,
     debug = debug,
+    enable_cache = enable_cache,
     background = background,
     # has_animation = v_count > 1,
     token = token,
     show_inactive_electrodes = isTRUE(show_inactive_electrodes),
     side_display = side_display,
     control_display = control_display,
+    qrcode = qrcode,
     custom_javascript = custom_javascript
   )
 
@@ -396,11 +405,10 @@ threejs_brain <- function(
       browser.external = browser_external,
       defaultHeight = '100vh',
       viewer.paneHeight = 500,
-      viewer.suppress = TRUE,
+      viewer.suppress = !isTRUE(embed),
       viewer.fill = TRUE,
       padding = '0px',
     ), dependencies = dependencies)
-
 }
 
 
@@ -439,158 +447,238 @@ renderBrain <- function(expr, env = parent.frame(), quoted = FALSE) {
 
 #' Save threeBrain widgets to local file system
 #' @author Zhengjia Wang
-#' @param widget generated from function 'threejs_brain'.
-#' @param directory directory to save the widget.
-#' @param filename default is 'index.html', filename of the widget index file.
-#' @param assetpath where to put \code{css} or \code{JavaScript} to,
-#' must be relative to \code{directory}.
-#' @param datapath where to store data to, must be relative to \code{directory}.
+#' @param widget generated from function 'threejs_brain'
+#' @param path path to save the brain widget
 #' @param title widget title.
 #' @param as_zip whether to create zip file "compressed.zip".
+#' @param ... ignored, used for backward compatibility
 #' @export
-save_brain <- function(widget, directory, filename = 'index.html', assetpath = 'lib/', datapath = 'lib/threebrain_data-0/', title = '3D Viewer', as_zip = FALSE){
-  dir_create(directory)
+save_brain <- function(widget, path, title = '3D Viewer', as_zip = FALSE, ...){
+  # Backward compatible:
+  # old: directory is specified, path = directory/filename
+  # new: path is specified directory
+  args <- list(...)
+  if(missing(path)) {
+    path <- file.path(c(args$directory, ".")[[1]], c(args$filename, 'index.html')[[1]])
+  } else if ( !grepl(pattern = "\\.htm[l]{0,1}$", path, ignore.case = TRUE) ){
+    path <- sprintf("%s.html", path)
+  }
 
-  # Need to save json data to datapath. Must be a relative path
-  dir_create(file.path(directory, datapath))
-  dir_create(file.path(directory, assetpath))
-  datapath <- stringr::str_replace_all(datapath, '[/]{0}$', '/')
-  datapath <- stringr::str_replace_all(datapath, '[/\\\\]+', '/')
-  datapath <- stringr::str_replace_all(datapath, '^/', '')
+  widget$width <- args$width
+  widget$height <- args$height
 
-  assetpath <- stringr::str_replace_all(assetpath, '[/]{0}$', '/')
-  assetpath <- stringr::str_replace_all(assetpath, '[/\\\\]+', '/')
-  assetpath <- stringr::str_replace_all(assetpath, '^/', '')
+  # set up working directory
+  wdir <- dir_create(tempfile())
+  on.exit({ unlink(wdir, recursive = TRUE) })
 
-  widget$x$settings$cache_folder <- datapath
+  widget$x$settings$cache_folder <- "#"
+
+  # selfcontained = FALSE to save all data information
+  temp_file <- file.path(wdir, "_tmp.html")
   htmlwidgets::saveWidget(
     widget,
-    file = file.path(directory, filename),
+    file = temp_file,
     selfcontained = FALSE,
     title = title,
-    libdir = assetpath
+    libdir = "_lib"
   )
 
-  # Copy data to datapath
-  file_move(file.path(directory, assetpath, 'threebrain_data-0/'),
-            file.path(directory, datapath))
+  # Use htmlwidgets to save all js and css to html
+  html_text <- readLines(temp_file)
 
-  # cat2('Copying data...')
-  # dependencies = attr(widget, 'threeBrain_dependency')
-  # if("html_dependency" %in% class(dependencies)){
-  #   lib_name = sprintf('%s-%s', dependencies$name, dependencies$version)
-  #   file.copy(dependencies$src$file, file.path(directory, 'lib', lib_name), overwrite = T, recursive = T)
-  #   dependencies$
-  # }
+  # convert <script src=*> to <script>js file contents</script>
+  js_lines <- which(grepl(
+    x = html_text,
+    pattern = '(src=.*js)'
+  ))
 
-  # s <- c(
-  #   '#!/bin/bash',
-  #   'DIRECTORY=`dirname "$0"`',
-  #   'cd "$DIRECTORY"',
-  #   "Rscript -e '{if(system.file(\"\",package=\"servr\")==\"\"){install.packages(\"servr\",repos=\"https://cloud.r-project.org\")};servr::httd(browser=TRUE)}'"
-  # )
+  # convert link[rel=stylesheet] to <style>css file contents</style>
+  css_lines <- which(grepl(
+    x = html_text,
+    pattern = '(href=.*css)'
+  ))
 
-  # copy files from inst folder
-  cmd_folders <- system.file("commands/", package = "threeBrain")
-  fnames <- list.files(cmd_folders, all.files = FALSE, full.names = FALSE, recursive = FALSE)
-  for(f in fnames){
-    sh_file <- file.path(directory, f)
-    file.copy(file.path(cmd_folders, f), sh_file)
-    if(!(get_os() == "windows" || endsWith(f, "zip") || endsWith(f, "txt"))){
-      system(sprintf('chmod a+x "%s"', normalizePath(sh_file)), wait = FALSE)
-    }
+  readlines_quiet <- function(path) {
+    suppressWarnings({
+      readLines(path)
+    })
   }
 
-  directory <- normalizePath(directory)
+  # perform self-contained conversion/replacement of JS
+  if(length(js_lines) > 0) {
+    html_text[js_lines] <- lapply(js_lines, function(js_line) {
+      js_file <- sub(x = html_text[js_line],
+                     pattern = '.*src=[":\'](.*\\.js).*',
+                     replacement = "\\1")
+      js_content <- paste0("<script>",
+                           paste0(readlines_quiet(file.path(wdir, js_file)), collapse = "\n"),
+                           "</script>",
+                           collapse = "\n")
+    })
+  }
+
+
+  # perform self-contained conversion/replacement of JS
+  if(length(css_lines) > 0) {
+    html_text[css_lines] <- lapply(css_lines, function(css_line) {
+      css_file <- sub(x=html_text[css_line], pattern='.*href=[":\'](.*\\.css).*', replacement="\\1")
+      css_content <- paste0(
+        "<style>",
+        paste0(readlines_quiet(file.path(wdir,css_file)), collapse="\n"),
+        "</style>",
+        collapse="\n"
+      )
+    })
+  }
+
+  # save self-contained html
+  write(paste0(html_text, collapse = "\n"), file = temp_file)
+
+  # htmlwidgets::saveWidget(
+  #   widget,
+  #   file = file.path(wdir, "_tmp.html"),
+  #   selfcontained = TRUE,
+  #   title = title,
+  #   libdir = "lib"
+  # )
+
+  # modify the html so the data is injected as data URI
+  index <- file.path(wdir, "_tmp.html")
+
+  s <- readLines(index)
+  m <- stringr::str_match(s, '^(.*)</head>(.*)$')
+  idx <- which(!is.na(m[,1]))
+  if(length(idx)) {
+    idx <- idx[[1]]
+  } else {
+    idx <- 2L
+  }
+  pre <- s[seq_len(idx - 1)]
+  post <- s[seq.int(idx, length(s))]
+
+  # read in base64 of each files
+  datapath_root <- file.path(wdir, "_lib", 'threebrain_data-0/')
+  data_files <- list.files(datapath_root, all.files = FALSE, full.names = FALSE, recursive = TRUE, include.dirs = FALSE)
+
+  # Make sure the parent path exists
+  directory <- dir_create(dirname(path))
+  if(length(data_files)) {
+    # convert data into base64
+    conn <- file(path, "w+")
+    writeLines(pre, conn)
+
+    DATAURI_MAX <- floor(65529 / 73 * 54) #72 / 4 * 3
+    lapply(data_files, function(data_file) {
+      data_abspath <- file.path(datapath_root, data_file)
+
+      data_file <- gsub("[\\\\/]+", "/", x = data_file)
+      data_file <- gsub("^[/]+", "", data_file)
+      if(endsWith(data_file, "json")) {
+        datauri_type <- 'application/json'
+      } else {
+        datauri_type <- 'application/octet-stream'
+      }
+
+      fsize0 <- file.size(data_abspath)
+      fsize <- fsize0
+      fin <- file(data_abspath, open = "rb")
+      ii <- 0
+      while(fsize > 0) {
+        raws <- readBin(con = fin, what = "raw", n = min(fsize, DATAURI_MAX))
+        writeLines(c(
+          sprintf("<script type='text/plain;charset=UTF-8' data-for='#%s' data-partition='%d' data-type='%s' data-size='%.0f' data-start='%.0f' data-parition-size='%.0f'>", data_file, ii, datauri_type, fsize0, fsize0 - fsize, length(raws)),
+          jsonlite::base64_enc(input = raws),
+          "</script>"
+        ), conn)
+        fsize <- fsize - length(raws)
+        ii <- ii + 1
+      }
+      close(fin)
+    })
+
+    writeLines(post, conn)
+    close(conn)
+  } else {
+    file.copy(index, path, overwrite = TRUE)
+  }
+  unlink(wdir, recursive = TRUE)
+
   if(as_zip){
     wd <- getwd()
-    on.exit({
-      setwd(wd)
-    })
+    on.exit({ setwd(wd) })
     setwd(directory)
-    zipfile <- 'compressed.zip'
-    utils::zip(zipfile, files = c(
-      './lib', filename, 'linux.sh', 'mac.command', 'windows.bat', 'launch.zip',
-      'simple_server.py'))
+    fname <- basename(path)
+    zipfile <- paste0(fname, ".zip")
+    utils::zip(zipfile, files = fname)
   }
 
-  index <- file.path(directory, filename)
+  structure(
+    normalizePath(path),
+    class = 'threeBrain.save_brain'
+  )
+#
+#   directory <- normalizePath(directory)
 
-
-  s <- paste(readLines(index), collapse = '\n')
-  s <- stringr::str_replace_all(s, '\\n', '')
-
-  m <- stringr::str_match(s, '<head(.*?)</head>')
-  if(length(m)){
-    m <- m[1,2]
-    css <- unlist(stringr::str_extract_all(m, '<link[^>]*>'))
-    js <- unlist(stringr::str_extract_all(m, '<script[^>]*></script>'))
-  }else{
-    css <- NULL
-    js <- NULL
-  }
-
-  json <- stringr::str_match(s, '<script type="application/json" data-for=[^>]*>(.*)</script>')
-  if(length(json)){
-    json <- json[1,2]
-  }else{
-    json <- NULL
-  }
-
-  # content <- list(
-  #   css = css, js = js,
-  #   body = paste(
-  #     sep = "\n", collapse = "\n",
-  #     c(
-  #       '<div class="htmlwidget_container">\n\t<div id="{{ YOUR-WIDGET-ID }}" style="width:{{ shiny::validateCssUnit(height) }};height:{{ shiny::validateCssUnit(height) }};" class="threejs_brain html-widget">\n\t</div>\n</div>'
-  #     )
-  #   ),
-  #   footer = paste(
-  #     sep = "\n", collapse = "\n",
-  #     c(
-  #       '<script type="application/json" data-for="{{ YOUR-WIDGET-ID }}">',
-  #       json,
-  #       '</script>'
-  #     )
-  #   )
-  # )
-
-  as_shiny <- function(outputId, width = "100%", height = "100vh") {
-    f <- tempfile()
-    on.exit(unlink(f))
-    writeLines(c(
-      paste0(
-        '<div class="htmlwidget_container">\n\t<div id="',
-        outputId,
-        '" style="width:',
-        shiny::validateCssUnit(width),
-        ';height:',
-        shiny::validateCssUnit(height),
-        ';" class="threejs_brain html-widget">\n\t</div>\n</div>\n'
-      ),
-      paste0(
-        '<script type="application/json" data-for="',
-        outputId, '">',
-        json,
-        '</script>'
-      )
-    ), con = f, sep = "\n")
-    shiny::tagList(
-      shiny::singleton(shiny::HTML(c(css, js))),
-      shiny::includeHTML(f)
-    )
-  }
-
-
-
-
-  return(structure(list(
-    directory = directory,
-    index = index,
-    zipfile = file.path(directory, 'compressed.zip'),
-    has_zip = as_zip,
-    as_shiny = as_shiny
-  ), class = 'threeBrain_saved'))
+#
+#
+#   s <- paste(readLines(file.path(directory, filename)), collapse = '\n')
+#
+#
+#   # s <- stringr::str_replace_all(s, '\\n', '')
+#
+#   m <- stringr::str_match(s, '<head(.*?)</head>')
+#   if(length(m)){
+#     m <- m[1,2]
+#     css <- unlist(stringr::str_extract_all(m, '<link[^>]*>'))
+#     js <- unlist(stringr::str_extract_all(m, '<script[^>]*></script>'))
+#   }else{
+#     css <- NULL
+#     js <- NULL
+#   }
+#
+#   json <- stringr::str_match(s, '<script type="application/json" data-for=[^>]*>(.*)</script>')
+#   if(length(json)){
+#     json <- json[1,2]
+#   }else{
+#     json <- NULL
+#   }
+#
+#   as_shiny <- function(outputId, width = "100%", height = "100vh") {
+#     f <- tempfile()
+#     on.exit(unlink(f))
+#     writeLines(c(
+#       paste0(
+#         '<div class="htmlwidget_container">\n\t<div id="',
+#         outputId,
+#         '" style="width:',
+#         shiny::validateCssUnit(width),
+#         ';height:',
+#         shiny::validateCssUnit(height),
+#         ';" class="threejs_brain html-widget">\n\t</div>\n</div>\n'
+#       ),
+#       paste0(
+#         '<script type="application/json" data-for="',
+#         outputId, '">',
+#         json,
+#         '</script>'
+#       )
+#     ), con = f, sep = "\n")
+#     shiny::tagList(
+#       shiny::singleton(shiny::HTML(c(css, js))),
+#       shiny::includeHTML(f)
+#     )
+#   }
+#
+#
+#
+#
+#   return(structure(list(
+#     directory = directory,
+#     index = index,
+#     zipfile = file.path(directory, 'compressed.zip'),
+#     has_zip = as_zip,
+#     as_shiny = as_shiny
+#   ), class = 'threeBrain_saved'))
 
 }
 
@@ -622,67 +710,29 @@ red_col <- function(...){
 }
 
 #' @export
-print.threeBrain_saved <- function(x, ...){
+plot.threeBrain.save_brain <- function(x, ...){
+  x <- normalizePath(x, winslash = "/", mustWork = TRUE)
+  x <- gsub("[\\\\/]+", "/", x)
+  utils::browseURL(sprintf("file://%s", x))
+}
 
-  index <- x$index
-
-  if(!file.exists(index)){
-    warning('Cannot find index file at: ', index)
-    return(invisible())
-  }
-  s <- paste(readLines(index), collapse = '\n')
-  s <- stringr::str_replace_all(s, '\\n', '')
-
-  m <- stringr::str_match(s, '<head(.*?)</head>')
-  if(length(m)){
-    m <- m[1,2]
-    css <- unlist(stringr::str_extract_all(m, '<link[^>]*>'))
-    js <- unlist(stringr::str_extract_all(m, '<script[^>]*></script>'))
-  }else{
-    css <- NULL
-    js <- NULL
-  }
-
-  cat(grey_col('<!---------- Instructions to Embed 3D viewer in your own websites --------->\n'))
-
-  cat(grey_col('\n<!-- Step 1: In HTML header (<head>...</head>), add the following lines -->\n'))
-  headers <- c(css, js)
-  if(length(headers)){
-    cat(green_col(headers), sep = '\n')
-  }
-
-  json <- stringr::str_match(s, '<script type="application/json" data-for=[^>]*>(.*)</script>')
-  if(length(json)){
-    json <- json[1,2]
-  }else{
-    json <- NULL
-  }
-
-
-  cat(grey_col('\n<!-- Step 2: In HTML body tags where you want to insert widget into, \n\tcopy-paste the following lines. Please change the highlighted parts. \n\tYour "YOUR-WIDGET-ID" Must be unique across the whole document  -->\n'))
-
-  cat(
-    green_col('<div id="htmlwidget_container">\n\t<div id="'),
-    red_col('YOUR-WIDGET-ID'),
-    green_col('" style="'),
-    red_col('width:100%;height:100vh;'),
-    green_col('" class="threejs_brain html-widget">\n\t</div>\n</div>'),
-    '\n',
-    sep = ''
+#' @export
+format.threeBrain.save_brain <- function(x, ...){
+  path_exists <- file.exists(x)
+  paste(
+    c(
+      "<Static 3D Viewer>\n",
+      "Path : ", x, "\n",
+      "Valid: ", as.character(path_exists), "\n",
+      "To view the static viewer, use:\n",
+      sprintf("  utils::browseURL('%s')", x)
+    ),
+    collapse = ""
   )
+}
 
-  cat(grey_col('\n<!-- Step 3: At the end of HTML (before </html>), insert the data script\n\tMake sure "YOUR-WIDGET-ID" matches with the previous step. -->\n'))
-
-  cat(green_col('<script type="application/json" data-for="'),
-      red_col('YOUR-WIDGET-ID'),
-      green_col('">'),
-      green_col(json),
-      green_col('</script>'),
-      '\n',
-      sep = '')
-
-  cat(grey_col('<!---------- End of Instructions --------->\n'))
-
-
+#' @export
+print.threeBrain.save_brain <- function(x, ...){
+  cat(format(x), "\n", sep = "")
   invisible(x)
 }

@@ -1,29 +1,29 @@
-## ---- include = FALSE---------------------------------------------------------
+## ----include = FALSE----------------------------------------------------------
 knitr::opts_chunk$set(
   collapse = TRUE,
   comment = "#>",
   eval = FALSE
 )
 
-## ----setup--------------------------------------------------------------------
+## ----setup, eval=FALSE--------------------------------------------------------
 #  library(threeBrain)
 #  subject_code <- "N27"
 #  subject_path <- "~/Downloads/N27"
-#  brain <- freesurfer_brain2(subject_path, subject_code)
+#  brain <- threeBrain(subject_path, subject_code)
 
-## -----------------------------------------------------------------------------
+## ----eval=FALSE---------------------------------------------------------------
 #  electrode_table <- `~/Downloads/N27/electrodes.csv`
 #  brain$set_electrodes(electrode_table)
 #  brain$plot()
 
-## -----------------------------------------------------------------------------
+## ----eval=FALSE---------------------------------------------------------------
 #  electrode_table <- `~/Downloads/N27/electrodes.csv`
 #  value_table <- `~/Downloads/N27/values.csv`
 #  brain$set_electrodes(electrode_table)
 #  brain$set_electrode_values(value_table)
 #  brain$plot()
 
-## -----------------------------------------------------------------------------
+## ----eval=FALSE---------------------------------------------------------------
 #  pal <- c(
 #    colorRampPalette(c("red", "#FFC6C6"))(8),
 #    colorRampPalette(c("#FFC6C6", "white"))(56)

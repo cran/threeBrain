@@ -8,9 +8,10 @@ threeBrain(
   path,
   subject_code,
   surface_types = "pial",
-  atlas_types = "aparc+aseg",
+  atlas_types,
   ...,
-  template_subject = unname(getOption("threeBrain.template_subject", "N27"))
+  template_subject = unname(getOption("threeBrain.template_subject", "N27")),
+  backward_compatible = getOption("threeBrain.compatible", FALSE)
 )
 }
 \arguments{
@@ -22,7 +23,8 @@ containing 'FreeSurfer' files, or simply a 'RAVE' subject}
 \item{surface_types}{surface types to load; default is \code{'pial'},
 other common types are \code{'white'}, \code{'smoothwm'}}
 
-\item{atlas_types}{brain atlas to load; default is \code{'aparc+aseg'},
+\item{atlas_types}{brain atlas to load; default is \code{'wmparc'},
+or if not exists, \code{'aparc+aseg'},
 other choices are \code{'aparc.a2009s+aseg'}, \code{'aparc.DKTatlas+aseg'},
 depending on the atlas files in \code{'fs/mri'} folder}
 
@@ -30,6 +32,8 @@ depending on the atlas files in \code{'fs/mri'} folder}
 
 \item{template_subject}{template subject to refer to; used for group
 template mapping}
+
+\item{backward_compatible}{whether to support old format; default is false}
 }
 \description{
 Create a brain object

@@ -116,6 +116,29 @@ ViewerProxy <- R6::R6Class(
       ))
     },
 
+    set_electrode_data = function(data, palettes = NULL, value_ranges = NULL, clear_first = FALSE, update_display = TRUE) {
+      stopifnot2(
+        is.data.frame(data),
+        msg = "brain_proxy$set_electrode_data(data, ...): `data` must be a data.frame."
+      )
+      private$set_value('set_electrode_data', list(
+        data = data,
+        palettes = as.list(palettes),
+        valueRanges = as.list(value_ranges),
+        clearFirst = clear_first,
+        updateDisplay = update_display
+      ))
+    },
+
+    set_electrode_palette = function(colors, variable) {
+      colors <- col2hexStr(colors)
+      stopifnot2(length(colors) > 0, msg = "`colors` must not be empty")
+      private$set_value('set_electrode_palette', list(
+        colors = colors,
+        name = variable
+      ))
+    },
+
     set_cex = function( cex = 1 ){
       stopifnot2(cex > 0, msg = 'cex must be positive')
       private$set_value('font_magnification', cex)
@@ -130,10 +153,26 @@ ViewerProxy <- R6::R6Class(
       ))
     },
 
+    set_matrix_world = function( name, m44 ) {
+      if(length(m44) != 16) {
+        stop("brain_proxy$set_matrix_world: `m44` must be a 4x4 matrix")
+      }
+      if(is.matrix(m44)) {
+        m44 <- as.vector(t(m44))
+      }
+      private$set_value('set_matrix_world', list(
+        instanceName = name,
+        matrix = m44,
+        byrow = TRUE
+      ))
+    },
+
     add_localization_electrode = function(params, update_shiny = TRUE){
       params <- as.list(params)
-      if(length(c(params$Coord_x,params$Coord_y,params$Coord_z)) != 3){
-        stop("`add_localization_electrode` must contains valid `Coord_x, Coord_y, Coord_z` (tkrRAS)")
+      if(!isTRUE(params$is_prototype)) {
+        if(length(c(params$Coord_x,params$Coord_y,params$Coord_z)) != 3){
+          stop("`add_localization_electrode` must contains valid `Coord_x, Coord_y, Coord_z` (tkrRAS)")
+        }
       }
       params$update_shiny <- isTRUE(update_shiny)
       private$set_value('add_localization_electrode', params)
@@ -382,6 +421,11 @@ ViewerProxy <- R6::R6Class(
       tbl
     },
 
+    localization_add_quaternion = function() {
+      private$ensure_session()
+      private$get_value('localization_addQuaternion', list())
+    },
+
     mouse_event_double_click = function(){
       private$get_value('mouse_dblclicked', list())
     },
@@ -406,6 +450,58 @@ ViewerProxy <- R6::R6Class(
 
     sync = function(){
       private$get_value('sync', '')
+    },
+
+    acpc_alignment = function() {
+      data <- private$get_value('acpc_realign', list())
+      if(!length(data) || !is.list(data)) { return(data) }
+      acpc <- data$acpc
+      Torig <- matrix(unlist(data$transforms$Torig), byrow = FALSE, nrow = 4)
+      Norig <- matrix(unlist(data$transforms$Norig), byrow = FALSE, nrow = 4)
+
+      tkr2scanner <- Norig %*% solve(Torig)
+
+      ac <- c(0, 0, 0)
+      ac_set <- FALSE
+      if(isTRUE(acpc$acSet)) {
+        ac <- (tkr2scanner %*% c(unlist(acpc$ac), 1))[seq_len(3)]
+        ac_set <- TRUE
+      }
+      pc <- c(0, -1, 0)
+      pc_set <- FALSE
+      if(isTRUE(acpc$pcSet)) {
+        pc <- (tkr2scanner %*% c(unlist(acpc$pc), 1))[seq_len(3)]
+        pc_set <- TRUE
+      }
+      x_axis <- (tkr2scanner %*% c(unlist(acpc$xAxis), 0))[seq_len(3)]
+      if(all(x_axis == 0)) {
+        x_axis <- c(1, 0, 0)
+      } else {
+        x_axis <- x_axis / norm(x_axis, type = "2")
+      }
+      y_axis <- ac - pc
+      if(all(y_axis == 0)) {
+        y_axis <- c(0, 1, 0)
+        pc <- ac - y_axis
+      } else {
+        y_axis <- y_axis / norm(y_axis, type = "2")
+      }
+      z_axis <- cross_prod(x_axis, y_axis)
+      z_axis <- z_axis / norm(z_axis, type = "2")
+
+      # acpc_in_ras %*% c(0,0,0,1) -> ac
+      acpc_in_ras <- rbind(cbind(x_axis, y_axis, z_axis, ac), c(0, 0, 0, 1))
+      dimnames(acpc_in_ras) <- NULL
+      ras2acpc <- solve(acpc_in_ras)
+
+      list(
+        space = "scannerRAS",
+        ac = ac,
+        ac_set = ac_set,
+        pc = pc,
+        pc_set = pc_set,
+        ras2acpc = ras2acpc
+      )
     }
 
   )

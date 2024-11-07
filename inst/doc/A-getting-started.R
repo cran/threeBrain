@@ -1,4 +1,4 @@
-## ---- include = FALSE, message=FALSE, results='hide'--------------------------
+## ----include = FALSE, message=FALSE, results='hide'---------------------------
 knitr::opts_chunk$set(
   collapse = TRUE,
   comment = "#>",
@@ -6,11 +6,11 @@ knitr::opts_chunk$set(
 )
 library(threeBrain)
 
-## ----setup--------------------------------------------------------------------
+## ----setup, eval=FALSE--------------------------------------------------------
 #  library(threeBrain)
 #  subject_code <- "N27"
 #  subject_path <- "~/Downloads/N27"
-#  brain <- freesurfer_brain2(subject_path, subject_code)
+#  brain <- threeBrain(subject_path, subject_code)
 #  print(brain)
 #  #> Subject - N27
 #  #> Transforms:
@@ -51,11 +51,11 @@ library(threeBrain)
 #  #> Volume information (total count 1)
 #  #>   T1
 
-## -----------------------------------------------------------------------------
+## ----eval=FALSE---------------------------------------------------------------
 #  brain$plot()
 
-## -----------------------------------------------------------------------------
-#  brain <- freesurfer_brain2(
+## ----eval=FALSE---------------------------------------------------------------
+#  brain <- threeBrain(
 #    subject_path, subject_code,
 #    surface_types = c('pial', 'smoothwm'),
 #    atlas_types = 'aseg')

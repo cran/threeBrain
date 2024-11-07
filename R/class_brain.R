@@ -40,7 +40,7 @@ Brain2 <- R6::R6Class(
     Norig = diag(rep(1, 4)),
     Torig = diag(rep(1, 4)),
 
-    initialize = function(subject_code, xfm, Norig, Torig){
+    initialize = function(subject_code, xfm, Norig, Torig, base_path = NULL){
       stopifnot2( length(xfm) == 16 && length(dim(xfm)) == 2 && sum(dim(xfm)) == 8,
                   msg = 'xfm must be 4x4 matrix')
       stopifnot2( length(Norig) == 16 && length(dim(Norig)) == 2 && sum(dim(Norig)) == 8,
@@ -58,6 +58,7 @@ Brain2 <- R6::R6Class(
       self$volumes <- list()
       self$surfaces <- list()
       self$electrodes <- BrainElectrodes$new(subject_code = subject_code)
+      self$electrodes$set_brain( self )
       self$meta <- list()
 
       # TODO: put all brain global data (transform etc...) here
@@ -65,6 +66,11 @@ Brain2 <- R6::R6Class(
         group = GeomGroup$new(name = sprintf('_internal_group_data_%s', subject_code)),
         name = sprintf('_misc_%s', subject_code)
       )
+
+      if(length(base_path) == 1 && !is.na(base_path) && is.character(base_path) &&
+         file.exists(base_path)) {
+        self$base_path <- base_path
+      }
     },
 
     add_surface = function(
@@ -152,7 +158,14 @@ Brain2 <- R6::R6Class(
         surface <- BrainSurface$new(subject_code = subject_code, surface_type = surface_name, mesh_type = 'fs',
                                     left_hemisphere = surf_lh, right_hemisphere = surf_rh)
 
+      }
 
+      if( startsWith(surface$surface_type, "inflated") ) {
+        surface$left_hemisphere$position <- c(-50, 0, 0)
+        surface$right_hemisphere$position <- c(50, 0, 0)
+      } else if ( startsWith(surface$surface_type, "sphere") ) {
+        surface$left_hemisphere$position <- c(-128, 0, 0)
+        surface$right_hemisphere$position <- c(128, 0, 0)
       }
 
       if( !isTRUE(surface$has_hemispheres) ) {
@@ -162,16 +175,6 @@ Brain2 <- R6::R6Class(
 
       if( surface$mesh_type == 'std.141' ){
         surface$set_group_position( self$scanner_center )
-
-        offset_x <- switch (
-          surface$surface_type,
-          'inflated' = { offset_x <- 50 },
-          'sphere' = { offset_x <- 128 },
-          { 0 }
-        )
-        surface$left_hemisphere$position <- c(-offset_x, 0, 0)
-        surface$right_hemisphere$position <- c(offset_x, 0, 0)
-
       }else if( surface$mesh_type == 'fs' ){
         surface$set_group_position( 0, 0, 0 )
       }
@@ -228,14 +231,22 @@ Brain2 <- R6::R6Class(
       if(!inherits(atlas, 'brain-atlas')) {
 
         stopifnot2(is.character(atlas), msg = 'atlas must be a brain-atlas object or valid atlas name from FreeSurfer folder')
-        atlas <- gsub("_", "+", atlas)
         path_atlases <- file.path( self$base_path, "mri", as.vector(rbind(
           sprintf("%s.mgz", atlas),
           sprintf("%s.nii.gz", atlas),
           sprintf("%s.nii", atlas)
         )) )
         atlas_path <- path_atlases[file.exists(path_atlases)]
-        if(!length(atlas_path)) { return() }
+        if(!length(atlas_path)) {
+          atlas <- gsub("_", "+", atlas)
+          path_atlases <- file.path( self$base_path, "mri", as.vector(rbind(
+            sprintf("%s.mgz", atlas),
+            sprintf("%s.nii.gz", atlas),
+            sprintf("%s.nii", atlas)
+          )) )
+          atlas_path <- path_atlases[file.exists(path_atlases)]
+          if(!length(atlas_path)) { return() }
+        }
         atlas_path <- atlas_path[[ 1 ]]
 
         atlas_geom <- VolumeGeom2$new(
@@ -256,6 +267,8 @@ Brain2 <- R6::R6Class(
       atlas$set_subject_code( self$subject_code )
       self$atlases[[ atlas$atlas_type ]] <- atlas
 
+      return(atlas)
+
     },
 
     # special: must be cached path
@@ -275,12 +288,18 @@ Brain2 <- R6::R6Class(
       )
     },
 
-    set_electrodes = function(electrodes){
+    set_electrodes = function(electrodes, coord_sys = c("tkrRAS", "scannerRAS", "MNI305", "MNI152"), ...,
+                              priority = c("prototype", "sphere", "both")){
+      coord_sys <- match.arg(coord_sys)
+      priority <- match.arg(priority)
+      if( missing(electrodes) ) {
+        electrodes <- self$electrodes$raw_table
+      }
       if( R6::is.R6(electrodes) && 'brain-electrodes' %in% class(electrodes)){
         self$electrodes <- electrodes
-        self$electrodes$set_subject_code( self$subject_code )
+        self$electrodes$set_brain( self )
       }else{
-        self$electrodes$set_electrodes( electrodes )
+        self$electrodes$set_electrodes( electrodes, coord_sys = coord_sys, priority = priority, ... )
       }
     },
 
@@ -438,7 +457,7 @@ Brain2 <- R6::R6Class(
 
       if( isTRUE(electrodes) && !is.null(self$electrodes) ){
         # self$electrodes$set_values()
-        geoms <- c(geoms, self$electrodes$objects)
+        geoms <- c(geoms, unique(unlist(self$electrodes$objects)), unique(unlist(self$electrodes$objects2)))
       }
 
       geoms <- c(geoms, self$misc)
@@ -506,6 +525,7 @@ Brain2 <- R6::R6Class(
     ){
       control_presets <- c('localization', control_presets)
       controllers[["Highlight Box"]] <- FALSE
+      controllers[["Outlines"]] %?<-% "on"
 
       # Backward compatible
       if(missing(ct_path)) {
@@ -676,6 +696,8 @@ Brain2 <- R6::R6Class(
         # using RedFormat so color map is the color intensity in gray
         color = c("black", "white"),
 
+        bias = 0.2,
+
         # automatically re-scale the color map
         auto_rescale = TRUE
       )
@@ -688,6 +710,7 @@ Brain2 <- R6::R6Class(
       controllers[["Voxel Display"]] <- "normal"
       controllers[["Voxel Min"]] <- 3000
       controllers[["Edit Mode"]] %?<-% "CT/volume"
+      controllers[["Electrode Shape"]] %?<-% "prototype+sphere"
 
       # check if surface exists
       if(!length(self$surfaces)) {
@@ -733,11 +756,13 @@ Brain2 <- R6::R6Class(
 
       value_ranges = val_ranges, controllers = list(),
 
-      width = NULL, height = NULL, debug = FALSE, token = NULL, browser_external = TRUE, ... ){
+      width = NULL, height = NULL, debug = FALSE, token = NULL, browser_external = TRUE,
+      additional_geoms = NULL, ... ){
 
 
       # collect volume information
       geoms <- self$get_geometries( volumes = volumes, surfaces = surfaces, electrodes = TRUE, atlases = atlases )
+      geoms <- c(geoms, additional_geoms)
 
       is_r6 <- vapply(geoms, function(x){ 'AbstractGeom' %in% class(x) }, FALSE)
       geoms <- geoms[is_r6]
@@ -881,6 +906,155 @@ Brain2 <- R6::R6Class(
         ...
       )
 
+    },
+
+    plot_electrodes_on_slices = function(
+      electrodes_to_plot = "all",
+      volume = NULL,
+      overlays = NULL,
+      overlay_colors = DEFAULT_COLOR_DISCRETE,
+      overlay_alpha = 0.3,
+      elec_table = NULL,
+      zoom = 1, adjust_brightness = NA,
+      electrode_color = "green", electrode_size = 2,
+      verbose = TRUE, ...,
+      decoration = function(i, j) {
+        graphics::points(0, 0, pch = 20, col = electrode_color,
+                         cex = electrode_size)
+      },
+      device_init = NULL,
+      save_to = NULL, one_plot = is.null(save_to), width = 12, height = 4) {
+      # DIPSAUS DEBUG START
+      # self <- raveio::rave_brain('demo/DemoSubject')
+      # private <- self$private
+
+      # Load electrode table
+      if(!is.data.frame(elec_table)) {
+        elec_table <- self$electrodes$raw_table
+      }
+
+      if(!is.data.frame(elec_table) || !nrow(elec_table)) {
+        stop("Electrode table not specified")
+      }
+      tkr_ras <- as.matrix(elec_table[, c("Coord_x", "Coord_y", "Coord_z")])
+      invalids <- rowSums(tkr_ras^2) == 0
+      if(all(invalids)) {
+        stop("All electrodes are invalid. Cannot plot slices.")
+      }
+
+      if(is.character(electrodes_to_plot)) {
+        electrodes_to_plot <- elec_table$Electrode
+      }
+      plot_idx <- elec_table$Electrode %in% electrodes_to_plot & !invalids
+      if(!any(plot_idx)) {
+        stop("All specified electrodes to plot are invalid. Please double-check input `electrodes_to_plot`")
+      }
+      plot_idx <- which(plot_idx)
+
+      # transform electrode from tkrRAS (fs coord_sys) to scanner ras (T1 scanner)
+      scanner_ras <- self$electrodes$apply_transform_points(
+        tkr_ras,
+        from = "tkrRAS",
+        to = "scannerRAS"
+      )
+      scanner_ras[invalids, ] <- 0
+
+
+
+      # load up volume and adjust brightness
+
+      if(is.null(volume)) {
+        volume <- self$volumes$T1$object$group$group_data$volume_data$absolute_path
+        if(is.na(adjust_brightness)) {
+          adjust_brightness <- FALSE
+        }
+      }
+      if(!inherits(volume, "threeBrain.volume")) {
+        volume <- read_volume(volume)
+      }
+      if(is.na(adjust_brightness)) {
+        adjust_brightness <- TRUE
+      }
+      if( isTRUE(adjust_brightness) || isTRUE(adjust_brightness > 0 && adjust_brightness < 1) ) {
+        if(isTRUE(adjust_brightness)) {
+          adjust_brightness <- 0.95
+        }
+        qt <- quantile(volume$data, c(0, adjust_brightness), na.rm = TRUE)
+        volume$data[] <- (volume$data - qt[[1]]) / (qt[[2]] - qt[[1]]) * 255
+        volume$data[volume$data > 255] <- 255
+      }
+
+      if( length(overlays) ) {
+        if(length(overlay_colors) < length(overlays)) {
+          overlay_colors <- rep(overlay_colors, ceiling(length(overlays) / length(overlay_colors)))
+        }
+        overlays <- lapply(seq_along(overlays), function(ii) {
+          overlay_img <- overlays[[ii]]
+          if(is.character(overlay_img)) {
+            overlay_img <- read_volume(overlay_img)
+          }
+          list(
+            volume = overlay_img,
+            color = overlay_colors[[ii]]
+          )
+        })
+      } else {
+        overlays <- NULL
+      }
+
+      # img_height <- 480
+      # png(filename = file.path(subject$imaging_path, "snapshots%03d.png"), width = 3*img_height, height = img_height, bg = "black")
+
+      if(length(save_to) == 1 && isTRUE(is.character(save_to))) {
+        if(endsWith(tolower(save_to), "png")) {
+          save_to <- sprintf("%s-%%04d.png",
+                             gsub("[%0-9d]{0,}\\.png$", replacement = "",
+                                  save_to, ignore.case = TRUE))
+          grDevices::png(filename = save_to, width = width * 72,
+                         height = height * 72, bg = "black")
+        } else {
+          save_to <- sprintf("%s.pdf",
+                             gsub("\\.pdf", "", save_to, ignore.case = TRUE))
+          grDevices::pdf(save_to, width = width, height = height,
+                         useDingbats = FALSE, onefile = TRUE,
+                         title = "RAVE Slice Plots", bg = "black")
+        }
+        on.exit({ grDevices::dev.off() })
+
+      }
+      if(is.function(device_init)) {
+        device_init()
+      }
+
+
+
+      if( one_plot ) {
+        plot_idx <- list(plot_idx)
+      }
+      progress <- dipsaus::progress2("Plotting slices",
+                                     max = length(plot_idx) + 1,
+                                     shiny_auto_close = TRUE, quiet = !verbose)
+      for(ii in plot_idx) {
+        progress$inc(detail = sprintf("Generating graphs for electrode %s", dipsaus::deparse_svec(ii)))
+        plot_slices(
+          volume,
+          overlays = overlays,
+          overlay_alpha = overlay_alpha,
+          positions = scanner_ras[ii,],
+          main = sprintf('%s (Ch=%.0f,ScanRAS=%.1f,%.1f,%.1f)',
+                         elec_table$Label[ii],
+                         elec_table$Electrode[ii],
+                         scanner_ras[ii, 1],
+                         scanner_ras[ii, 2],
+                         scanner_ras[ii, 3]),
+          pixel_width = 1,
+          zoom = zoom,
+          fun = decoration,
+          ...
+        )
+      }
+      progress$inc(detail = "Closing graphic device")
+      # dev.off()
     }
 
   ),

@@ -23,6 +23,7 @@
 #' @importFrom freesurferformats read.fs.mgh
 #' @importFrom freesurferformats read.fs.morph
 #' @importFrom freesurferformats read.fs.surface
+#' @importFrom freesurferformats write.fs.surface
 #' @importFrom freesurferformats read.fs.volume
 #' @importFrom freesurferformats read.fs.weight
 #' @importFrom freesurferformats read.fs.transform
@@ -32,6 +33,10 @@
 #' @importFrom freesurferformats read.nifti2.header
 #' @importFrom freesurferformats write.nifti1
 #' @importFrom freesurferformats write.nifti2
+#'
+#' @importFrom png writePNG
+#'
+#' @importFrom knitr knit_print
 NULL
 
 # ----- Reexports ------------------------------------------------------------
@@ -53,6 +58,9 @@ freesurferformats::read.fs.morph
 
 #' @export
 freesurferformats::read.fs.surface
+
+#' @export
+freesurferformats::write.fs.surface
 
 #' @export
 freesurferformats::read.fs.volume
@@ -86,6 +94,23 @@ freesurferformats::write.nifti2
 
 cache_version <- 0.1
 
+DEFAULT_COLOR_DISCRETE <- c(
+  # default RAVE colors
+  "#FFA500", "#1874CD", "#006400", "#FF4500", "#A52A2A", "#7D26CD",
+
+  # selected from polychrome
+  "#FE00FA", "#16FF32", "#FBE426", "#B00068", "#1CFFCE", "#90AD1C",
+  "#2ED9FF", "#DEA0FD", "#F8A19F", "#325A9B", "#C4451C", "#1C8356",
+  "#85660D", "#B10DA1", "#1CBE4F", "#F7E1A0", "#C075A6", "#AAF400",
+  "#BDCDFF", "#822E1C", "#B5EFB5", "#7ED7D1", "#1C7F93", "#3B00FB"
+
+)
+
+DEFAULT_COLOR_CONTINUOUS <- c(
+  "#053061", "#2166ac", "#4393c3", "#92c5de", "#d1e5f0",
+  "#ffffff", "#fddbc7", "#f4a582", "#d6604d", "#b2182b", "#67001f"
+)
+
 #' @title Setup Package, Install Environment
 #' @author Zhengjia Wang
 #' @param continued logical, there are two phases of setting up environment. You
@@ -94,95 +119,37 @@ cache_version <- 0.1
 #' @param ... ignored
 #' @export
 brain_setup <- function(continued = FALSE, show_example = TRUE, ...){
-  use_python <- FALSE
-  try_conda <- FALSE
-  if( use_python && !continued ){
-    # cat2('Step 1: checking python environment', level = 'INFO')
-    # info = ravepy_info()
-    #
-    # if( any(!info) ){
-    #   cat2('Dependencies missing, checking python version', level = 'INFO')
-    #   re = reticulate::py_config()
-    #   print(re$python_versions)
-    #   if( length(re$python_versions) == 0 ){
-    #     stop('Cannot find Python3 installed. Please download Python3 at\n\n\thttps://www.python.org/downloads/\n\nand then come back.')
-    #   }
-    #   if(!any(
-    #     stringr::str_detect(re$python_versions, 'python3$'),
-    #     stringr::str_detect(re$python_versions, 'py3')
-    #   )){
-    #     stop('Cannot find Python3 installed. Please download Python3 at\n\n\thttps://www.python.org/downloads/\n\nand then come back.')
-    #   }
-    # }
+  cat2('Downloading N27 brain from the Internet.', level = 'INFO')
+  download_N27()
 
-    # # Install RAVEPy
-    # cat2('Step 2: Check whether RAVEPy is installed.', level = 'INFO')
-    # installed = ''
-    # tryCatch({
-    #   installed = ravepy_check(quiet = FALSE)
-    # }, error = function(e){
-    #   cat2('RAVEPy not found')
-    # })
-    #
-    # if( !length(installed) || !installed %in% c('conda', 'virtualenv') ){
-    #   cat2('Configure environment RAVEPy.', level = 'INFO')
-    #   if( try_conda && length( ravepy_find_conda_path(add_to_path = FALSE) ) ){
-    #     ravepy_conda_install()
-    #   }else{
-    #     ravepy_virtualenv_install()
-    #   }
-    # }
-    #
-    # # Try to restart
-    # restarted = FALSE
-    #
-    # if( system.file('', package = 'rstudioapi') != '' ){
-    #   # rstudioapi is installed
-    #   in_rsession = eval(parse(text = 'rstudioapi::isAvailable()'))
-    #   if( in_rsession ){
-    #     # restart
-    #     restarted = TRUE
-    #     eval(parse(text = "rstudioapi::restartSession('threeBrain:::ravepy_info();threeBrain:::cat2(\"Please check if all packages are installed :)\", level = \"INFO\");threeBrain::brain_setup(TRUE, TRUE)')"))
-    #   }
-    # }
+  cat2('Wrapping up installation...', level = 'INFO')
 
-    # if( !restarted ){
-    #   cat2('Please manually restart R. Go to "Session" > "Restart R", \nthen, enter \n\tthreeBrain::brain_setup(TRUE, TRUE)', level = 'WARNING')
-    # }
-  }else{
+  template_dir <- default_template_directory()
 
-    cat2('Downloading N27 brain from the Internet.', level = 'INFO')
-    download_N27()
-
-    cat2('Wrapping up installation...', level = 'INFO')
-
-    template_dir <- default_template_directory()
-
-    template <- merge_brain(template_subject = "N27", template_dir = template_dir, template_surface_types = c('pial', 'smoothwm'))
+  template <- merge_brain(template_subject = "N27", template_dir = template_dir, template_surface_types = c('pial', 'smoothwm'))
 
 
-    if( show_example ){
-      template$template_object$plot()
-    }
-
+  if( show_example ){
+    template$template_object$plot()
   }
-
-
 }
 
 get_os <- function(){
   os <- R.version$os
-  if(stringr::str_detect(os, '^darwin')){
+  if(grepl('^darwin', os, ignore.case = TRUE)){
     return('darwin')
   }
-  if(stringr::str_detect(os, '^linux')){
+  if(grepl('^linux', os, ignore.case = TRUE)){
     return('linux')
   }
-  if(stringr::str_detect(os, '^solaris')){
+  if(grepl('^solaris', os, ignore.case = TRUE)){
     return('solaris')
   }
-  if(stringr::str_detect(os, '^win')){
+  if(grepl('^win', os, ignore.case = TRUE)){
     return('windows')
+  }
+  if(grepl("^(emscr|wasm)", os, ignore.case = TRUE)) {
+    return('emscripten')
   }
   return('unknown')
 }
@@ -258,3 +225,20 @@ surface_alternative_types <- list(
   "white.K" = "white.preaparc.K",
   "white.H" = "white.preaparc.H"
 )
+
+TRANSFORM_SPACES <- c("tkr", "scanner", "mni152", "mni305")
+
+
+col2hexStr <- function(col, alpha = NULL, prefix = '#', ...){
+  if(is.null(alpha)){
+    alpha <- 1
+    transparent <- FALSE
+  }else{
+    transparent <- TRUE
+  }
+  re <- grDevices::adjustcolor(col, alpha.f = alpha)
+  if(!transparent){
+    re <- substr(re, start = 1L, stop = 7L)
+  }
+  gsub('^[^0-9A-F]*', prefix, re)
+}

@@ -104,6 +104,16 @@ MultiBrain2 <- R6::R6Class(
       self$template_object <- threeBrain(
         path = template_path, subject_code = template_subject,
         surface_types = surface_types, template_subject = template_subject)
+
+      # special treatments
+      if( isTRUE(template_subject %in% "cvs_avg35_inMNI152") ) {
+        # cvs_avg35_inMNI152 should sit in MNI152 space. However,
+        # it seems cvs_avg35_inMNI152 is not MNI152 aligned,
+        # possibly using non standard file or template c (c is different than
+        # a/b)
+        self$template_object$xfm <- solve(MNI305_to_MNI152)
+      }
+
     },
 
     add_subject = function(x){
@@ -128,6 +138,7 @@ MultiBrain2 <- R6::R6Class(
       control_presets <- c('localization', control_presets)
       controllers[["Edit Mode"]] <- "CT/volume"
       controllers[["Highlight Box"]] <- FALSE
+      controllers[["Outlines"]] %?<-% "on"
 
       if(!missing( coregistered_ct )){
         if(!inherits(coregistered_ct, "threeBrain.nii")) {
@@ -181,6 +192,8 @@ MultiBrain2 <- R6::R6Class(
       optionals = list(), debug = FALSE, token = NULL, browser_external = TRUE, ...
     ){
 
+      controllers <- as.list(controllers)
+      controllers[["Subject"]] <- self$template_object$subject_code
 
       geoms <- self$template_object$get_geometries( volumes = volumes, surfaces = surfaces, electrodes = TRUE )
 
